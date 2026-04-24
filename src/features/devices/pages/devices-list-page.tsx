@@ -5,7 +5,6 @@ import type { Device, User } from "@/data/types";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -27,8 +26,7 @@ export function DevicesListPage() {
 
   const [formData, setFormData] = useState({
     userId: "unassigned",
-    status: "Disponible",
-    firmwareVersion: "1.0.0",
+    status: "Disponible" as "Disponible" | "Asignado" | "Mantenimiento" | "Inactivo",
   });
 
   useEffect(() => {
@@ -57,14 +55,12 @@ export function DevicesListPage() {
       setFormData({
         userId: device.userId || "unassigned",
         status: device.status,
-        firmwareVersion: device.firmwareVersion,
       });
     } else {
       setEditingDevice(null);
       setFormData({
         userId: "unassigned",
         status: "Disponible",
-        firmwareVersion: "1.0.0",
       });
     }
     setIsModalOpen(true);
@@ -98,7 +94,7 @@ export function DevicesListPage() {
       } else {
         await api.addDevice({
           ...dataToSave,
-          batteryLevel: 100,
+          assignmentDate: null,
           lastSync: null,
         } as any);
         toast.success("Dispositivo registrado");
@@ -222,7 +218,7 @@ export function DevicesListPage() {
                     <span className="text-[#57657a]">Batería</span>
                     <div className="flex items-center gap-1.5 text-[#191c1e] font-medium">
                       {isAssigned ? <Battery className="w-4 h-4 text-[#24a375]" /> : <BatteryLow className="w-4 h-4 text-[#ba1a1a]" />}
-                      {isAssigned ? `${device.batteryLevel}%` : '--'}
+                      {isAssigned ? `100%` : '--'}
                     </div>
                   </div>
 
@@ -269,7 +265,7 @@ export function DevicesListPage() {
             
             <div className="space-y-2">
               <Label>Estado</Label>
-              <Select value={formData.status} onValueChange={(v) => setFormData({...formData, status: v})}>
+              <Select value={formData.status} onValueChange={(v) => setFormData({...formData, status: v as "Disponible" | "Asignado" | "Mantenimiento" | "Inactivo"})}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -279,11 +275,6 @@ export function DevicesListPage() {
                   <SelectItem value="Mantenimiento">Mantenimiento</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="firmware">Versión Firmware</Label>
-              <Input id="firmware" required value={formData.firmwareVersion} onChange={(e) => setFormData({...formData, firmwareVersion: e.target.value})} />
             </div>
 
             <DialogFooter className="pt-4">

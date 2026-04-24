@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Search, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { User, Company } from "@/data/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
