@@ -1,56 +1,53 @@
 import { Building2, Users, Watch, Activity, ArrowUpRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { mockCompanies, mockUsers, mockDevices } from "@/data/mock-data";
 import { StatsCard } from "@/components/shared/stats-card";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "react-router";
+import {
+  getStats, getSectors, getGrowth, getDeviceStatus, dashboardKeys,
+} from "@/lib/api/dashboard";
+import { listCompanies, companiesKeys } from "@/lib/api/companies";
 
 const COLORS = ["#1e3a8a", "#3b82f6", "#60a5fa", "#93c5fd"];
+const GROWTH_MONTHS = 12;
+
+const MONTH_FORMATTER = new Intl.DateTimeFormat("es-CO", { month: "short" });
 
 export function DashboardPage() {
-  const activeCompanies = mockCompanies.filter((c) => c.status === "Activa").length;
-  const totalUsers = mockUsers.length;
-  const assignedDevices = mockDevices.filter((d) => d.status === "Asignado").length;
-  const availableDevices = mockDevices.filter((d) => d.status === "Disponible").length;
+  const statsQuery = useQuery({ queryKey: dashboardKeys.stats, queryFn: getStats });
+  const sectorsQuery = useQuery({ queryKey: dashboardKeys.sectors, queryFn: getSectors });
+  const growthQuery = useQuery({ queryKey: dashboardKeys.growth(GROWTH_MONTHS), queryFn: () => getGrowth(GROWTH_MONTHS) });
+  const deviceStatusQuery = useQuery({ queryKey: dashboardKeys.deviceStatus, queryFn: getDeviceStatus });
 
-  const sectorData = Object.entries(
-    mockCompanies.reduce<Record<string, number>>((acc, company) => {
-      acc[company.sector] = (acc[company.sector] || 0) + 1;
-      return acc;
-    }, {})
-  ).map(([sector, count]) => ({ sector, count }));
+  const topCompaniesQuery = useQuery({
+    queryKey: companiesKeys.list({ status: "Activa", pageSize: 5, sort: "employee_count:desc" }),
+    queryFn: () => listCompanies({ status: "Activa", pageSize: 5, sort: "employee_count:desc" }),
+  });
 
-  const growthData = [
-    { month: "Oct", users: 420 },
-    { month: "Nov", users: 485 },
-    { month: "Dic", users: 560 },
-    { month: "Ene", users: 680 },
-    { month: "Feb", users: 890 },
-    { month: "Mar", users: 1019 },
-  ];
+  const stats = statsQuery.data;
+  const activeCompanies = stats?.activeCompanies ?? 0;
+  const totalUsers = stats?.totalEmployees ?? 0;
+  const assignedDevices = stats?.assignedDevices ?? 0;
+  const availableDevices = stats?.availableDevices ?? 0;
 
-  const deviceStatusData = [
-    { name: "Asignado", value: mockDevices.filter((d) => d.status === "Asignado").length },
-    { name: "Disponible", value: mockDevices.filter((d) => d.status === "Disponible").length },
-    { name: "Mantenimiento", value: mockDevices.filter((d) => d.status === "Mantenimiento").length },
-    { name: "Inactivo", value: mockDevices.filter((d) => d.status === "Inactivo").length },
-  ].filter((item) => item.value > 0);
+  const sectorData = sectorsQuery.data ?? [];
 
-  const recentActivity = [
-    { type: "success", title: "Nueva empresa registrada", detail: "TechSolutions Ltda.", time: "Hace 2 horas" },
-    { type: "info", title: "Dispositivo asignado", detail: "PB-003004 a Laura Martínez", time: "Hace 5 horas" },
-    { type: "warning", title: "Usuario actualizado", detail: "Carlos Gómez cambió de área", time: "Hace 1 día" },
-    { type: "error", title: "Empresa suspendida", detail: "Café de Colombia Export", time: "Hace 2 días" },
-    { type: "info", title: "15 nuevos usuarios registrados", detail: "Grupo Nutresa", time: "Hace 3 días" },
-  ];
+  const growthData = (growthQuery.data ?? []).map((p) => ({
+    month: MONTH_FORMATTER.format(new Date(p.month)),
+    users: p.employees,
+  }));
 
-  const topCompanies = mockCompanies
-    .filter((c) => c.status === "Activa")
-    .sort((a, b) => b.employeeCount - a.employeeCount)
-    .slice(0, 5);
+  const deviceStatusData = (deviceStatusQuery.data ?? []).map((p) => ({
+    name: p.status,
+    value: p.count,
+  }));
+
+  const topCompanies = topCompaniesQuery.data?.items ?? [];
 
   return (
     <div className="p-6 space-y-6 bg-gray-50">
@@ -64,28 +61,25 @@ export function DashboardPage() {
         <StatsCard
           title="Empresas Activas"
           value={activeCompanies}
-          change={{ value: "+12% vs mes anterior", trend: "up" }}
           icon={Building2}
           iconColor="text-green-600"
         />
         <StatsCard
           title="Total Usuarios"
           value={totalUsers.toLocaleString()}
-          change={{ value: "+8% vs mes anterior", trend: "up" }}
           icon={Users}
           iconColor="text-blue-600"
         />
         <StatsCard
-          title="Dispositivos Activos"
+          title="Dispositivos Asignados"
           value={assignedDevices}
           change={{ value: `${availableDevices} disponibles`, trend: "neutral" }}
           icon={Watch}
           iconColor="text-purple-600"
         />
         <StatsCard
-          title="Nuevos Registros"
-          value="24"
-          change={{ value: "Este mes", trend: "up" }}
+          title="Dispositivos Disponibles"
+          value={availableDevices}
           icon={Activity}
           iconColor="text-orange-600"
         />
@@ -97,7 +91,7 @@ export function DashboardPage() {
           <CardHeader className="border-b border-gray-100 pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base font-semibold">Crecimiento de Usuarios</CardTitle>
-              <Badge variant="secondary" className="text-xs">Últimos 6 meses</Badge>
+              <Badge variant="secondary" className="text-xs">Últimos {GROWTH_MONTHS} meses</Badge>
             </div>
           </CardHeader>
           <CardContent className="pt-6">
@@ -105,7 +99,7 @@ export function DashboardPage() {
               <LineChart data={growthData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
                 <Tooltip />
                 <Line type="monotone" dataKey="users" stroke="#1e3a8a" strokeWidth={3} dot={{ fill: "#1e3a8a", r: 4 }} />
               </LineChart>
@@ -127,7 +121,7 @@ export function DashboardPage() {
                   innerRadius={60}
                   outerRadius={90}
                   dataKey="value"
-                  label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                  label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
                 >
                   {deviceStatusData.map((entry, index) => (
                     <Cell key={`cell-${entry.name}`} fill={COLORS[index % COLORS.length]} />
@@ -159,7 +153,7 @@ export function DashboardPage() {
               <BarChart data={sectorData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="sector" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
                 <Tooltip />
                 <Bar dataKey="count" fill="#1e3a8a" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -169,27 +163,40 @@ export function DashboardPage() {
 
         <Card>
           <CardHeader className="border-b border-gray-100 pb-4">
-            <CardTitle className="text-base font-semibold">Actividad Reciente</CardTitle>
+            <CardTitle className="text-base font-semibold">Resumen Operativo</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="space-y-4">
-              {recentActivity.map((activity, index) => (
-                <div key={index} className="flex items-start gap-3 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
-                  <div
-                    className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                      activity.type === "success" ? "bg-green-500" :
-                      activity.type === "info" ? "bg-blue-500" :
-                      activity.type === "warning" ? "bg-orange-500" :
-                      "bg-red-500"
-                    }`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{activity.title}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{activity.detail}</p>
-                    <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
-                  </div>
+              <div className="flex items-start gap-3 pb-4 border-b border-gray-100">
+                <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900">Empresas activas</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{activeCompanies} clientes con servicio vigente</p>
                 </div>
-              ))}
+              </div>
+              <div className="flex items-start gap-3 pb-4 border-b border-gray-100">
+                <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900">Cobertura de dispositivos</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {totalUsers > 0 ? `${Math.round((assignedDevices / totalUsers) * 100)}% de empleados con PostureBand` : "Sin empleados registrados"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 pb-4 border-b border-gray-100">
+                <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900">Stock disponible</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{availableDevices} dispositivos listos para asignar</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-2 h-2 rounded-full bg-gray-500 mt-1.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900">Total empleados</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{totalUsers.toLocaleString()} registrados en el sistema</p>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -200,10 +207,10 @@ export function DashboardPage() {
         <CardHeader className="border-b border-gray-100 pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-semibold">Principales Empresas</CardTitle>
-            <a href="/companies" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
+            <Link to="/companies" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
               Ver todas
               <ArrowUpRight className="w-4 h-4" />
-            </a>
+            </Link>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -219,7 +226,13 @@ export function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {topCompanies.map((company) => (
+                {topCompanies.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                      {topCompaniesQuery.isLoading ? "Cargando..." : "Sin empresas activas"}
+                    </td>
+                  </tr>
+                ) : topCompanies.map((company) => (
                   <tr key={company.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{company.name}</div>

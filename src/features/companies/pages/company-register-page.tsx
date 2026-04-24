@@ -10,9 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createCompany, companiesKeys } from "@/lib/api/companies";
+import { ApiError } from "@/lib/api/client";
 
 export function CompanyRegisterPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     name: "",
     nit: "",
@@ -26,18 +30,44 @@ export function CompanyRegisterPage() {
     contactPosition: "",
     contactEmail: "",
     contactPhone: "",
-    status: "Activa",
+    status: "Activa" as "Activa" | "Inactiva" | "En negociación" | "Suspendida",
     observations: "",
+  });
+
+  const mutation = useMutation({
+    mutationFn: createCompany,
+    onSuccess: () => {
+      toast.success("Empresa registrada exitosamente");
+      queryClient.invalidateQueries({ queryKey: companiesKeys.all });
+      navigate("/companies");
+    },
+    onError: (err) => {
+      const msg = err instanceof ApiError ? err.message : "Error al registrar empresa";
+      toast.error(msg);
+    },
   });
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    toast.success("Empresa registrada exitosamente");
-    setTimeout(() => navigate("/companies"), 1500);
+    mutation.mutate({
+      name: formData.name,
+      nit: formData.nit,
+      sector: formData.sector,
+      size: formData.size,
+      city: formData.city,
+      address: formData.address,
+      phone: formData.phone,
+      email: formData.email,
+      contactName: formData.contactName,
+      contactPosition: formData.contactPosition,
+      status: formData.status,
+      observations: formData.observations,
+      registrationDate: new Date().toISOString().slice(0, 10),
+    });
   };
 
   const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }) as typeof prev);
   };
 
   return (
@@ -175,9 +205,9 @@ export function CompanyRegisterPage() {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Cancelar
             </Button>
-            <Button type="submit" className="bg-[#1e3a8a] hover:bg-[#1e40af] min-w-32">
+            <Button type="submit" className="bg-[#1e3a8a] hover:bg-[#1e40af] min-w-32" disabled={mutation.isPending}>
               <Save className="w-4 h-4 mr-2" />
-              Guardar
+              {mutation.isPending ? "Guardando..." : "Guardar"}
             </Button>
           </div>
         </form>

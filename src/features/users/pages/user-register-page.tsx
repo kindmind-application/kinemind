@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,15 +10,63 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/shared/page-header";
+import { listCompanies, companiesKeys } from "@/lib/api/companies";
+import { createEmployee, employeesKeys } from "@/lib/api/employees";
+import { ApiError } from "@/lib/api/client";
 
 export function UserRegisterPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [documentType, setDocumentType] = useState("CC");
+  const [documentNumber, setDocumentNumber] = useState("");
+  const [companyId, setCompanyId] = useState<string>("");
+  const [position, setPosition] = useState("");
+  const [area, setArea] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [status, setStatus] = useState<"Activo" | "Inactivo" | "Pendiente">("Activo");
+
+  const companiesQuery = useQuery({
+    queryKey: companiesKeys.list({ pageSize: 100, sort: "name:asc" }),
+    queryFn: () => listCompanies({ pageSize: 100, sort: "name:asc" }),
+  });
+
+  const mutation = useMutation({
+    mutationFn: createEmployee,
+    onSuccess: () => {
+      toast.success("Usuario registrado exitosamente");
+      queryClient.invalidateQueries({ queryKey: employeesKeys.all });
+      navigate("/users");
+    },
+    onError: (err) => {
+      const msg = err instanceof ApiError ? err.message : "Error al registrar usuario";
+      toast.error(msg);
+    },
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Usuario registrado exitosamente", { description: "El usuario ha sido creado en el sistema." });
-    navigate("/users");
+    if (!companyId) {
+      toast.error("Debe seleccionar una empresa");
+      return;
+    }
+    mutation.mutate({
+      companyId,
+      name: `${firstName} ${lastName}`.trim(),
+      document: documentNumber,
+      position,
+      area,
+      email,
+      phone,
+      status,
+      joinDate: new Date().toISOString().slice(0, 10),
+    });
   };
+
+  const companies = companiesQuery.data?.items ?? [];
 
   return (
     <div className="bg-gray-50 min-h-full p-6">
@@ -38,15 +88,15 @@ export function UserRegisterPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">Nombres *</Label>
-                  <Input id="firstName" placeholder="Ingrese los nombres" required />
+                  <Input id="firstName" placeholder="Ingrese los nombres" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lastName">Apellidos *</Label>
-                  <Input id="lastName" placeholder="Ingrese los apellidos" required />
+                  <Input id="lastName" placeholder="Ingrese los apellidos" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="documentType">Tipo de Documento *</Label>
-                  <Select required>
+                  <Select value={documentType} onValueChange={setDocumentType} required>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccione" />
                     </SelectTrigger>
@@ -59,24 +109,7 @@ export function UserRegisterPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="document">Número de Documento *</Label>
-                  <Input id="document" placeholder="Ingrese el número" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="birthDate">Fecha de Nacimiento</Label>
-                  <Input id="birthDate" type="date" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="gender">Género</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="M">Masculino</SelectItem>
-                      <SelectItem value="F">Femenino</SelectItem>
-                      <SelectItem value="O">Otro</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input id="document" placeholder="Ingrese el número" value={documentNumber} onChange={(e) => setDocumentNumber(e.target.value)} required />
                 </div>
               </div>
             </CardContent>
@@ -90,46 +123,35 @@ export function UserRegisterPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="company">Empresa *</Label>
-                  <Select required>
+                  <Select value={companyId} onValueChange={setCompanyId} required>
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccione empresa" />
+                      <SelectValue placeholder={companiesQuery.isLoading ? "Cargando..." : "Seleccione empresa"} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">TechCorp Solutions S.A.S</SelectItem>
-                      <SelectItem value="2">Grupo Industrial Andino</SelectItem>
-                      <SelectItem value="3">Clínica Santa María del Rosario</SelectItem>
-                      <SelectItem value="4">Constructora Horizonte S.A.</SelectItem>
-                      <SelectItem value="5">BancoSeguro Colombia</SelectItem>
+                      {companies.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="employeeId">ID Empleado</Label>
-                  <Input id="employeeId" placeholder="Código interno" />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="position">Cargo *</Label>
-                  <Input id="position" placeholder="Ingrese el cargo" required />
+                  <Input id="position" placeholder="Ingrese el cargo" value={position} onChange={(e) => setPosition(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="area">Área / Departamento *</Label>
-                  <Input id="area" placeholder="Ingrese el área" required />
+                  <Input id="area" placeholder="Ingrese el área" value={area} onChange={(e) => setArea(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="startDate">Fecha de Ingreso</Label>
-                  <Input id="startDate" type="date" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="shift">Turno / Jornada</Label>
-                  <Select>
+                  <Label htmlFor="status">Estado</Label>
+                  <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccione" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="diurna">Diurna</SelectItem>
-                      <SelectItem value="nocturna">Nocturna</SelectItem>
-                      <SelectItem value="mixta">Mixta</SelectItem>
-                      <SelectItem value="rotativa">Rotativa</SelectItem>
+                      <SelectItem value="Activo">Activo</SelectItem>
+                      <SelectItem value="Pendiente">Pendiente</SelectItem>
+                      <SelectItem value="Inactivo">Inactivo</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -145,15 +167,11 @@ export function UserRegisterPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Correo Electrónico *</Label>
-                  <Input id="email" type="email" placeholder="correo@empresa.com" required />
+                  <Input id="email" type="email" placeholder="correo@empresa.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Teléfono / Celular</Label>
-                  <Input id="phone" placeholder="+57" />
-                </div>
-                <div className="md:col-span-2 space-y-2">
-                  <Label htmlFor="address">Dirección</Label>
-                  <Input id="address" placeholder="Dirección completa" />
+                  <Label htmlFor="phone">Teléfono / Celular *</Label>
+                  <Input id="phone" placeholder="+57" value={phone} onChange={(e) => setPhone(e.target.value)} required />
                 </div>
               </div>
             </CardContent>
@@ -161,31 +179,21 @@ export function UserRegisterPage() {
 
           <Card>
             <CardHeader className="border-b border-gray-100 pb-4">
-              <CardTitle className="text-base font-semibold">Información Médica (Opcional)</CardTitle>
+              <CardTitle className="text-base font-semibold">Notas adicionales (opcional)</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="eps">EPS</Label>
-                  <Input id="eps" placeholder="Entidad prestadora de salud" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="arl">ARL</Label>
-                  <Input id="arl" placeholder="Administradora de riesgos laborales" />
-                </div>
-                <div className="md:col-span-2 space-y-2">
-                  <Label htmlFor="medicalNotes">Condiciones Médicas Relevantes</Label>
-                  <Textarea id="medicalNotes" placeholder="Información médica relevante para el uso del dispositivo..." rows={3} />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="notes">Observaciones</Label>
+                <Textarea id="notes" placeholder="Información adicional (no persistida en esta versión)" rows={3} />
               </div>
             </CardContent>
           </Card>
 
           <div className="flex justify-end gap-3 pb-6">
             <Button type="button" variant="outline" onClick={() => navigate(-1)}>Cancelar</Button>
-            <Button type="submit" className="bg-[#1e3a8a] hover:bg-[#1e40af]">
+            <Button type="submit" className="bg-[#1e3a8a] hover:bg-[#1e40af]" disabled={mutation.isPending}>
               <Save className="w-4 h-4 mr-2" />
-              Registrar Usuario
+              {mutation.isPending ? "Guardando..." : "Registrar Usuario"}
             </Button>
           </div>
         </form>

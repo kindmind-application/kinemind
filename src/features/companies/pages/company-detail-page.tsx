@@ -1,20 +1,46 @@
 import { useParams, useNavigate, Link } from "react-router";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Edit, UserPlus, Watch, AlertCircle, Activity, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { mockCompanies, mockUsers, mockDevices } from "@/data/mock-data";
 import { StatsCard } from "@/components/shared/stats-card";
 import { DataTable } from "@/components/shared/data-table";
+import { getCompany, companiesKeys } from "@/lib/api/companies";
+import { listEmployees, employeesKeys } from "@/lib/api/employees";
+import { listDevices, devicesKeys } from "@/lib/api/devices";
+import type { User, Device } from "@/data/types";
 
 export function CompanyDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const company = mockCompanies.find((c) => c.id === id);
-  const companyUsers = mockUsers.filter((u) => u.companyId === id);
-  const companyDevices = mockDevices.filter((d) => d.companyId === id);
+  const companyQuery = useQuery({
+    queryKey: companiesKeys.detail(id ?? ""),
+    queryFn: () => getCompany(id!),
+    enabled: !!id,
+  });
+
+  const employeesQuery = useQuery({
+    queryKey: employeesKeys.list({ companyId: id, pageSize: 100 }),
+    queryFn: () => listEmployees({ companyId: id, pageSize: 100 }),
+    enabled: !!id,
+  });
+
+  const devicesQuery = useQuery({
+    queryKey: devicesKeys.list({ companyId: id, pageSize: 100 }),
+    queryFn: () => listDevices({ companyId: id, pageSize: 100 }),
+    enabled: !!id,
+  });
+
+  const company = companyQuery.data;
+  const companyUsers = employeesQuery.data?.items ?? [];
+  const companyDevices = devicesQuery.data?.items ?? [];
+
+  if (companyQuery.isLoading) {
+    return <div className="p-6 text-center py-12 text-gray-500">Cargando...</div>;
+  }
 
   if (!company) {
     return (
@@ -45,7 +71,7 @@ export function CompanyDetailPage() {
     {
       key: "name",
       header: "Empleado",
-      render: (user: (typeof mockUsers)[0]) => (
+      render: (user: User) => (
         <div>
           <div className="font-medium text-gray-900">{user.name}</div>
           <div className="text-xs text-gray-500">{user.document}</div>
@@ -55,7 +81,7 @@ export function CompanyDetailPage() {
     {
       key: "position",
       header: "Cargo",
-      render: (user: (typeof mockUsers)[0]) => (
+      render: (user: User) => (
         <div>
           <div className="text-sm text-gray-900">{user.position}</div>
           <div className="text-xs text-gray-500">{user.area}</div>
@@ -65,19 +91,19 @@ export function CompanyDetailPage() {
     {
       key: "email",
       header: "Correo",
-      render: (user: (typeof mockUsers)[0]) => <span className="text-sm text-gray-600">{user.email}</span>,
+      render: (user: User) => <span className="text-sm text-gray-600">{user.email}</span>,
     },
     {
       key: "status",
       header: "Estado",
-      render: (user: (typeof mockUsers)[0]) => (
+      render: (user: User) => (
         <Badge variant={getStatusVariant(user.status)} className="text-xs">{user.status}</Badge>
       ),
     },
     {
       key: "deviceId",
       header: "Dispositivo",
-      render: (user: (typeof mockUsers)[0]) =>
+      render: (user: User) =>
         user.deviceId ? (
           <Badge variant="outline" className="text-xs">{user.deviceId}</Badge>
         ) : (
@@ -90,24 +116,24 @@ export function CompanyDetailPage() {
     {
       key: "id",
       header: "ID Dispositivo",
-      render: (device: (typeof mockDevices)[0]) => <span className="font-medium text-gray-900">{device.id}</span>,
+      render: (device: Device) => <span className="font-medium text-gray-900">{device.id}</span>,
     },
     {
       key: "userName",
       header: "Usuario Asignado",
-      render: (device: (typeof mockDevices)[0]) => <span className="text-sm text-gray-600">{device.userName || "-"}</span>,
+      render: (device: Device) => <span className="text-sm text-gray-600">{device.userName || "-"}</span>,
     },
     {
       key: "status",
       header: "Estado",
-      render: (device: (typeof mockDevices)[0]) => (
+      render: (device: Device) => (
         <Badge variant={getStatusVariant(device.status)} className="text-xs">{device.status}</Badge>
       ),
     },
     {
       key: "assignmentDate",
       header: "Fecha Asignación",
-      render: (device: (typeof mockDevices)[0]) => (
+      render: (device: Device) => (
         <span className="text-sm text-gray-600">
           {device.assignmentDate ? new Date(device.assignmentDate).toLocaleDateString("es-ES") : "-"}
         </span>
@@ -116,14 +142,12 @@ export function CompanyDetailPage() {
     {
       key: "lastSync",
       header: "Última Sincronización",
-      render: (device: (typeof mockDevices)[0]) => <span className="text-sm text-gray-600">{device.lastSync || "-"}</span>,
+      render: (device: Device) => (
+        <span className="text-sm text-gray-600">
+          {device.lastSync ? new Date(device.lastSync).toLocaleString("es-ES") : "-"}
+        </span>
+      ),
     },
-  ];
-
-  const activityTimeline = [
-    { type: "info", title: "Dispositivo asignado", detail: "PB-001235 asignado a Laura Martínez Cruz", time: "20 de enero, 2025 - 10:30 AM" },
-    { type: "success", title: "Usuario registrado", detail: "Juan Pérez Rodríguez agregado al sistema", time: "20 de enero, 2025 - 09:15 AM" },
-    { type: "success", title: "Empresa registrada", detail: "Registro inicial en el sistema", time: "15 de enero, 2025 - 14:00 PM" },
   ];
 
   return (
@@ -159,8 +183,8 @@ export function CompanyDetailPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatsCard title="Usuarios Registrados" value={company.employeeCount} icon={Users} iconColor="text-blue-600" />
           <StatsCard title="Dispositivos Activos" value={company.devicesAssigned} icon={Watch} iconColor="text-green-600" />
-          <StatsCard title="Alertas Recientes" value="3" icon={AlertCircle} iconColor="text-orange-600" />
-          <StatsCard title="Última Actividad" value="2h" icon={Activity} iconColor="text-purple-600" />
+          <StatsCard title="Alertas Recientes" value="0" icon={AlertCircle} iconColor="text-orange-600" />
+          <StatsCard title="Última Actividad" value="-" icon={Activity} iconColor="text-purple-600" />
         </div>
 
         <Tabs defaultValue="general" className="space-y-6">
@@ -168,7 +192,6 @@ export function CompanyDetailPage() {
             <TabsTrigger value="general">Información General</TabsTrigger>
             <TabsTrigger value="users">Usuarios ({companyUsers.length})</TabsTrigger>
             <TabsTrigger value="devices">Dispositivos ({companyDevices.length})</TabsTrigger>
-            <TabsTrigger value="history">Historial</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-6">
@@ -194,10 +217,12 @@ export function CompanyDetailPage() {
                     <div><p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Teléfono</p><p className="text-sm text-gray-900 mt-1">{company.phone}</p></div>
                     <div><p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email</p><p className="text-sm text-gray-900 mt-1">{company.email}</p></div>
                   </div>
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Registro</p>
-                    <p className="text-sm text-gray-900 mt-1">{new Date(company.registrationDate).toLocaleDateString("es-ES", { year: "numeric", month: "long", day: "numeric" })}</p>
-                  </div>
+                  {company.registrationDate && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Registro</p>
+                      <p className="text-sm text-gray-900 mt-1">{new Date(company.registrationDate).toLocaleDateString("es-ES", { year: "numeric", month: "long", day: "numeric" })}</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -220,33 +245,19 @@ export function CompanyDetailPage() {
           </TabsContent>
 
           <TabsContent value="users">
-            <DataTable columns={userColumns} data={companyUsers} emptyMessage="No hay usuarios registrados para esta empresa" />
+            <DataTable
+              columns={userColumns}
+              data={companyUsers}
+              emptyMessage={employeesQuery.isLoading ? "Cargando..." : "No hay usuarios registrados para esta empresa"}
+            />
           </TabsContent>
 
           <TabsContent value="devices">
-            <DataTable columns={deviceColumns} data={companyDevices} emptyMessage="No hay dispositivos asignados a esta empresa" />
-          </TabsContent>
-
-          <TabsContent value="history">
-            <Card>
-              <CardHeader className="border-b border-gray-100 pb-4">
-                <CardTitle className="text-base font-semibold">Historial de Actividad</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="space-y-4">
-                  {activityTimeline.map((activity, index) => (
-                    <div key={index} className="flex items-start gap-3 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
-                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${activity.type === "success" ? "bg-green-500" : activity.type === "info" ? "bg-blue-500" : "bg-gray-500"}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{activity.title}</p>
-                        <p className="text-xs text-gray-600 mt-0.5">{activity.detail}</p>
-                        <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <DataTable
+              columns={deviceColumns}
+              data={companyDevices}
+              emptyMessage={devicesQuery.isLoading ? "Cargando..." : "No hay dispositivos asignados a esta empresa"}
+            />
           </TabsContent>
         </Tabs>
       </div>

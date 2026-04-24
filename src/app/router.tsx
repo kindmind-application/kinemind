@@ -1,14 +1,16 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import { AppLayout } from "@/components/layout/app-layout";
+import { ProtectedRoute } from "@/app/ProtectedRoute";
+import { LoginPage } from "@/features/auth/pages/login-page";
 import { DashboardPage } from "@/features/dashboard/pages/dashboard-page";
 import { CompaniesListPage } from "@/features/companies/pages/companies-list-page";
 import { CompanyRegisterPage } from "@/features/companies/pages/company-register-page";
 import { CompanyDetailPage } from "@/features/companies/pages/company-detail-page";
 import { UserRegisterPage } from "@/features/users/pages/user-register-page";
+import { UsersListPage } from "@/features/users/pages/users-list-page";
+import { DevicesListPage } from "@/features/devices/pages/devices-list-page";
 import { DeviceAssignmentPage } from "@/features/devices/pages/device-assignment-page";
 import {
-  UsersListPage,
-  DevicesListPage,
   ProductionPage,
   InventoryPage,
   LogisticsPage,
@@ -17,9 +19,14 @@ import {
 } from "@/features/placeholder-pages";
 
 export const router = createBrowserRouter([
+  { path: "/login", element: <LoginPage /> },
   {
     path: "/",
-    element: <AppLayout />,
+    element: (
+      <ProtectedRoute>
+        <AppLayout />
+      </ProtectedRoute>
+    ),
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", element: <DashboardPage /> },

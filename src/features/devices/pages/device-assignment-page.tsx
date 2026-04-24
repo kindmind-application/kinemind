@@ -1,32 +1,76 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Save, Watch, Wrench, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/shared/page-header";
-import { mockDevices } from "@/data/mock-data";
+import { listDevices, assignDevice, devicesKeys } from "@/lib/api/devices";
+import { listCompanies, companiesKeys } from "@/lib/api/companies";
+import { listEmployees, employeesKeys } from "@/lib/api/employees";
+import { ApiError } from "@/lib/api/client";
 
 export function DeviceAssignmentPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [deviceSearch, setDeviceSearch] = useState("");
+  const [deviceId, setDeviceId] = useState<string>("");
+  const [companyId, setCompanyId] = useState<string>("");
+  const [employeeId, setEmployeeId] = useState<string>("");
 
-  const availableDevices = mockDevices.filter(
-    (d) => d.status === "Disponible" && d.id.toLowerCase().includes(deviceSearch.toLowerCase())
-  );
+  const availableDevicesQuery = useQuery({
+    queryKey: devicesKeys.list({ status: "Disponible", pageSize: 100 }),
+    queryFn: () => listDevices({ status: "Disponible", pageSize: 100 }),
+  });
+
+  const companiesQuery = useQuery({
+    queryKey: companiesKeys.list({ pageSize: 100, sort: "name:asc" }),
+    queryFn: () => listCompanies({ pageSize: 100, sort: "name:asc" }),
+  });
+
+  const employeesQuery = useQuery({
+    queryKey: employeesKeys.list({ companyId: companyId || undefined, pageSize: 100 }),
+    queryFn: () => listEmployees({ companyId: companyId || undefined, pageSize: 100 }),
+    enabled: !!companyId,
+  });
+
+  const mutation = useMutation({
+    mutationFn: (vars: { deviceId: string; employeeId: string }) =>
+      assignDevice(vars.deviceId, vars.employeeId),
+    onSuccess: () => {
+      toast.success("Dispositivo asignado exitosamente");
+      queryClient.invalidateQueries({ queryKey: devicesKeys.all });
+      queryClient.invalidateQueries({ queryKey: employeesKeys.all });
+      navigate("/devices");
+    },
+    onError: (err) => {
+      const msg = err instanceof ApiError ? err.message : "Error al asignar dispositivo";
+      toast.error(msg);
+    },
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Dispositivo asignado exitosamente", {
-      description: "El PostureBand ha sido vinculado al usuario.",
-    });
-    navigate(-1);
+    if (!deviceId || !employeeId) {
+      toast.error("Seleccione un dispositivo y un usuario");
+      return;
+    }
+    mutation.mutate({ deviceId, employeeId });
   };
+
+  const availableDevices = useMemo(() => {
+    const all = availableDevicesQuery.data?.items ?? [];
+    const q = deviceSearch.toLowerCase();
+    return q ? all.filter((d) => d.id.toLowerCase().includes(q)) : all;
+  }, [availableDevicesQuery.data, deviceSearch]);
+
+  const companies = companiesQuery.data?.items ?? [];
+  const employees = employeesQuery.data?.items ?? [];
 
   return (
     <div className="bg-gray-50 min-h-full p-6">
@@ -53,28 +97,18 @@ export function DeviceAssignmentPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="deviceId">ID del Dispositivo *</Label>
-                      <Select required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione dispositivo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {mockDevices
-                            .filter((d) => d.status === "Disponible")
-                            .map((d) => (
-                              <SelectItem key={d.id} value={d.id}>
-                                {d.id}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="firmwareVersion">Versión de Firmware</Label>
-                      <Input id="firmwareVersion" placeholder="v2.1.3" readOnly className="bg-gray-50" />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="deviceId">ID del Dispositivo *</Label>
+                    <Select value={deviceId} onValueChange={setDeviceId} required>
+                      <SelectTrigger>
+                        <SelectValue placeholder={availableDevicesQuery.isLoading ? "Cargando..." : "Seleccione dispositivo"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableDevices.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>{d.id}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardContent>
               </Card>
@@ -87,90 +121,29 @@ export function DeviceAssignmentPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="company">Empresa *</Label>
-                      <Select required>
+                      <Select value={companyId} onValueChange={(v) => { setCompanyId(v); setEmployeeId(""); }} required>
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccione empresa" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="1">TechCorp Solutions S.A.S</SelectItem>
-                          <SelectItem value="2">Grupo Industrial Andino</SelectItem>
-                          <SelectItem value="3">Clínica Santa María del Rosario</SelectItem>
-                          <SelectItem value="4">Constructora Horizonte S.A.</SelectItem>
-                          <SelectItem value="5">BancoSeguro Colombia</SelectItem>
+                          {companies.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="user">Usuario *</Label>
-                      <Select required>
+                      <Select value={employeeId} onValueChange={setEmployeeId} disabled={!companyId} required>
                         <SelectTrigger>
-                          <SelectValue placeholder="Seleccione usuario" />
+                          <SelectValue placeholder={!companyId ? "Primero elige una empresa" : employeesQuery.isLoading ? "Cargando..." : "Seleccione usuario"} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="U001">Juan Pérez Rodríguez</SelectItem>
-                          <SelectItem value="U002">María García López</SelectItem>
-                          <SelectItem value="U003">Carlos Hernández Ruiz</SelectItem>
-                          <SelectItem value="U004">Laura Martínez Cruz</SelectItem>
+                          {employees.map((u) => (
+                            <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="border-b border-gray-100 pb-4">
-                  <CardTitle className="text-base font-semibold">Configuración de Asignación</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="assignmentDate">Fecha de Asignación *</Label>
-                      <Input id="assignmentDate" type="date" required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="monitoringMode">Modo de Monitoreo</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione modo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="continuous">Continuo</SelectItem>
-                          <SelectItem value="scheduled">Programado</SelectItem>
-                          <SelectItem value="on-demand">Bajo demanda</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="alertLevel">Nivel de Alerta</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione nivel" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Bajo</SelectItem>
-                          <SelectItem value="medium">Medio</SelectItem>
-                          <SelectItem value="high">Alto</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="syncInterval">Intervalo de Sincronización</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione intervalo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="5">Cada 5 minutos</SelectItem>
-                          <SelectItem value="15">Cada 15 minutos</SelectItem>
-                          <SelectItem value="30">Cada 30 minutos</SelectItem>
-                          <SelectItem value="60">Cada hora</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="md:col-span-2 space-y-2">
-                      <Label htmlFor="notes">Notas de Asignación</Label>
-                      <Textarea id="notes" placeholder="Observaciones sobre la asignación del dispositivo..." rows={3} />
                     </div>
                   </div>
                 </CardContent>
@@ -178,9 +151,9 @@ export function DeviceAssignmentPage() {
 
               <div className="flex justify-end gap-3">
                 <Button type="button" variant="outline" onClick={() => navigate(-1)}>Cancelar</Button>
-                <Button type="submit" className="bg-[#1e3a8a] hover:bg-[#1e40af]">
+                <Button type="submit" className="bg-[#1e3a8a] hover:bg-[#1e40af]" disabled={mutation.isPending}>
                   <Save className="w-4 h-4 mr-2" />
-                  Asignar Dispositivo
+                  {mutation.isPending ? "Asignando..." : "Asignar Dispositivo"}
                 </Button>
               </div>
             </form>
@@ -205,16 +178,23 @@ export function DeviceAssignmentPage() {
                   />
                 </div>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {availableDevices.length === 0 ? (
+                  {availableDevicesQuery.isLoading ? (
+                    <p className="text-xs text-gray-500 text-center py-4">Cargando...</p>
+                  ) : availableDevices.length === 0 ? (
                     <p className="text-xs text-gray-500 text-center py-4">No hay dispositivos disponibles</p>
                   ) : (
                     availableDevices.map((device) => (
-                      <div key={device.id} className="p-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                      <div
+                        key={device.id}
+                        onClick={() => setDeviceId(device.id)}
+                        className={`p-2.5 border rounded-lg cursor-pointer transition-colors ${
+                          deviceId === device.id ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-gray-900">{device.id}</span>
                           <Badge variant="default" className="text-[10px]">{device.status}</Badge>
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5">Firmware: v2.1.3</p>
                       </div>
                     ))
                   )}
