@@ -127,7 +127,7 @@ export function DashboardPage() {
                   innerRadius={60}
                   outerRadius={90}
                   dataKey="value"
-                  label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                  label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
                 >
                   {deviceStatusData.map((entry, index) => (
                     <Cell key={`cell-${entry.name}`} fill={COLORS[index % COLORS.length]} />

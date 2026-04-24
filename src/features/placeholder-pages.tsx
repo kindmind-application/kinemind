@@ -1,12 +1,6 @@
 import { ComingSoon } from "@/components/shared/coming-soon";
 
-export function UsersListPage() {
-  return <ComingSoon title="Gestión de Usuarios" description="Administre los empleados registrados, sus perfiles y dispositivos asignados." />;
-}
-
-export function DevicesListPage() {
-  return <ComingSoon title="Gestión de Dispositivos" description="Monitoree y administre todos los dispositivos PostureBand del sistema." />;
-}
+// Users and Devices are now implemented in their own modules.
 
 export function ProductionPage() {
   return <ComingSoon title="Producción" description="Control y seguimiento de la producción de dispositivos PostureBand." />;

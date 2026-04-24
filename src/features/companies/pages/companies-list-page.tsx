@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Plus, Search, Eye, Edit, MoreVertical, Building2, Users as UsersIcon, Watch } from "lucide-react";
+import { Plus, Search, Eye, Edit, MoreVertical, Building2, Users as UsersIcon, Watch, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PageHeader } from "@/components/shared/page-header";
 import { StatsCard } from "@/components/shared/stats-card";
 import { DataTable } from "@/components/shared/data-table";
-import { mockCompanies } from "@/data/mock-data";
+import { api } from "@/lib/api";
+import type { Company } from "@/data/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,16 +20,44 @@ import {
 
 export function CompaniesListPage() {
   const navigate = useNavigate();
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sectorFilter, setSectorFilter] = useState<string>("all");
 
-  const totalCompanies = mockCompanies.length;
-  const totalUsers = mockCompanies.reduce((sum, c) => sum + c.employeeCount, 0);
-  const totalDevices = mockCompanies.reduce((sum, c) => sum + c.devicesAssigned, 0);
-  const activeCompanies = mockCompanies.filter((c) => c.status === "Activa").length;
+  useEffect(() => {
+    loadCompanies();
+  }, []);
 
-  const filteredCompanies = mockCompanies.filter((company) => {
+  const loadCompanies = async () => {
+    setLoading(true);
+    try {
+      const data = await api.getCompanies();
+      setCompanies(data);
+    } catch (error) {
+      console.error("Failed to load companies:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("¿Está seguro de eliminar esta empresa?")) return;
+    try {
+      await api.deleteCompany(id);
+      await loadCompanies();
+    } catch (error) {
+      console.error("Failed to delete company:", error);
+    }
+  };
+
+  const totalCompanies = companies.length;
+  const totalUsers = companies.reduce((sum, c) => sum + c.employeeCount, 0);
+  const totalDevices = companies.reduce((sum, c) => sum + c.devicesAssigned, 0);
+  const activeCompanies = companies.filter((c) => c.status === "Activa").length;
+
+  const filteredCompanies = companies.filter((company) => {
     const matchesSearch =
       company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       company.nit.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -53,7 +82,7 @@ export function CompaniesListPage() {
     {
       key: "name",
       header: "Empresa",
-      render: (company: (typeof mockCompanies)[0]) => (
+      render: (company: Company) => (
         <div>
           <div className="font-medium text-gray-900">{company.name}</div>
           <div className="text-xs text-gray-500">{company.nit}</div>
@@ -63,14 +92,14 @@ export function CompaniesListPage() {
     {
       key: "sector",
       header: "Sector",
-      render: (company: (typeof mockCompanies)[0]) => (
+      render: (company: Company) => (
         <span className="text-sm text-gray-600">{company.sector}</span>
       ),
     },
     {
       key: "city",
       header: "Ciudad",
-      render: (company: (typeof mockCompanies)[0]) => (
+      render: (company: Company) => (
         <span className="text-sm text-gray-600">{company.city}</span>
       ),
     },
@@ -78,7 +107,7 @@ export function CompaniesListPage() {
       key: "employeeCount",
       header: "Empleados",
       className: "text-center",
-      render: (company: (typeof mockCompanies)[0]) => (
+      render: (company: Company) => (
         <span className="text-sm font-medium text-gray-900">{company.employeeCount.toLocaleString()}</span>
       ),
     },
@@ -86,14 +115,14 @@ export function CompaniesListPage() {
       key: "devicesAssigned",
       header: "Dispositivos",
       className: "text-center",
-      render: (company: (typeof mockCompanies)[0]) => (
+      render: (company: Company) => (
         <span className="text-sm font-medium text-gray-900">{company.devicesAssigned}</span>
       ),
     },
     {
       key: "status",
       header: "Estado",
-      render: (company: (typeof mockCompanies)[0]) => (
+      render: (company: Company) => (
         <Badge variant={getStatusVariant(company.status)} className="text-xs">
           {company.status}
         </Badge>
@@ -103,7 +132,7 @@ export function CompaniesListPage() {
       key: "actions",
       header: "",
       className: "text-right",
-      render: (company: (typeof mockCompanies)[0]) => (
+      render: (company: Company) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -115,13 +144,17 @@ export function CompaniesListPage() {
               <Eye className="w-4 h-4 mr-2" />
               Ver detalle
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(`/companies/register?edit=${company.id}`)}>
               <Edit className="w-4 h-4 mr-2" />
               Editar
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(`/users?company=${company.id}`)}>
               <UsersIcon className="w-4 h-4 mr-2" />
               Ver usuarios
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleDelete(company.id)} className="text-red-600">
+              <Trash2 className="w-4 h-4 mr-2" />
+              Eliminar
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -147,7 +180,7 @@ export function CompaniesListPage() {
           <StatsCard
             title="Empresas Activas"
             value={activeCompanies}
-            change={{ value: `${((activeCompanies / totalCompanies) * 100).toFixed(0)}% del total`, trend: "up" }}
+            change={{ value: totalCompanies ? `${((activeCompanies / totalCompanies) * 100).toFixed(0)}% del total` : '0%', trend: "up" }}
             icon={Building2}
             iconColor="text-green-600"
           />
@@ -198,7 +231,11 @@ export function CompaniesListPage() {
           </div>
         </Card>
 
-        <DataTable columns={columns} data={filteredCompanies} emptyMessage="No se encontraron empresas" />
+        {loading ? (
+          <div className="text-center py-12 text-gray-500">Cargando empresas...</div>
+        ) : (
+          <DataTable columns={columns} data={filteredCompanies} emptyMessage="No se encontraron empresas" />
+        )}
 
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-600">
@@ -208,8 +245,8 @@ export function CompaniesListPage() {
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled>Anterior</Button>
             <Button size="sm" className="bg-[#1e3a8a] hover:bg-[#1e40af]">1</Button>
-            <Button variant="outline" size="sm">2</Button>
-            <Button variant="outline" size="sm">Siguiente</Button>
+            <Button variant="outline" size="sm" disabled={filteredCompanies.length === 0}>2</Button>
+            <Button variant="outline" size="sm" disabled={filteredCompanies.length === 0}>Siguiente</Button>
           </div>
         </div>
       </div>

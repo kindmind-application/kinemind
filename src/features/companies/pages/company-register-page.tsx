@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
-import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 import { ArrowLeft, Save, Building2, User, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,9 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
+import { api } from "@/lib/api";
 
 export function CompanyRegisterPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get("edit");
+
   const [formData, setFormData] = useState({
     name: "",
     nit: "",
@@ -30,10 +34,51 @@ export function CompanyRegisterPage() {
     observations: "",
   });
 
-  const handleSubmit = (e: FormEvent) => {
+  useEffect(() => {
+    if (editId) {
+      api.getCompanies().then(companies => {
+        const company = companies.find(c => c.id === editId);
+        if (company) {
+          setFormData({
+            name: company.name,
+            nit: company.nit,
+            sector: company.sector,
+            size: company.size,
+            city: company.city,
+            address: company.address,
+            phone: company.phone,
+            email: company.email,
+            contactName: company.contactName,
+            contactPosition: company.contactPosition,
+            contactEmail: company.email, // using main email if not separate
+            contactPhone: company.phone,
+            status: company.status,
+            observations: company.observations,
+          });
+        }
+      });
+    }
+  }, [editId]);
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    toast.success("Empresa registrada exitosamente");
-    setTimeout(() => navigate("/companies"), 1500);
+    try {
+      if (editId) {
+        await api.updateCompany(editId, formData as any);
+        toast.success("Empresa actualizada exitosamente");
+      } else {
+        await api.addCompany({
+          ...formData,
+          employeeCount: 0,
+          devicesAssigned: 0,
+          registrationDate: new Date().toISOString().split("T")[0]
+        } as any);
+        toast.success("Empresa registrada exitosamente");
+      }
+      setTimeout(() => navigate("/companies"), 1500);
+    } catch (error) {
+      toast.error("Error al procesar la empresa");
+    }
   };
 
   const handleChange = (field: string, value: string) => {
@@ -42,7 +87,7 @@ export function CompanyRegisterPage() {
 
   return (
     <div className="bg-gray-50 min-h-full">
-      <PageHeader title="Registrar Nueva Empresa" description="Complete la información de la empresa cliente" />
+      <PageHeader title={editId ? "Editar Empresa" : "Registrar Nueva Empresa"} description="Complete la información de la empresa cliente" />
 
       <div className="p-6">
         <form onSubmit={handleSubmit} className="max-w-5xl mx-auto space-y-6">

@@ -6,9 +6,9 @@ import { CompanyRegisterPage } from "@/features/companies/pages/company-register
 import { CompanyDetailPage } from "@/features/companies/pages/company-detail-page";
 import { UserRegisterPage } from "@/features/users/pages/user-register-page";
 import { DeviceAssignmentPage } from "@/features/devices/pages/device-assignment-page";
+import { UsersListPage } from "@/features/users/pages/users-list-page";
+import { DevicesListPage } from "@/features/devices/pages/devices-list-page";
 import {
-  UsersListPage,
-  DevicesListPage,
   ProductionPage,
   InventoryPage,
   LogisticsPage,
