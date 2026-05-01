@@ -10,13 +10,11 @@ import { UserRegisterPage } from "@/features/users/pages/user-register-page";
 import { UsersListPage } from "@/features/users/pages/users-list-page";
 import { DevicesListPage } from "@/features/devices/pages/devices-list-page";
 import { DeviceAssignmentPage } from "@/features/devices/pages/device-assignment-page";
-import {
-  ProductionPage,
-  InventoryPage,
-  LogisticsPage,
-  SalesPage,
-  SettingsPage,
-} from "@/features/placeholder-pages";
+import { SalesPage } from "@/features/sales/pages/sales-page";
+import { ProductionPage } from "@/features/production/pages/production-page";
+import { InventoryPage } from "@/features/inventory/pages/inventory-page";
+import { LogisticsPage } from "@/features/logistics/pages/logistics-page";
+import { SettingsPage } from "@/features/settings/pages/settings-page";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },

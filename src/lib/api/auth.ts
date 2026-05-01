@@ -28,3 +28,17 @@ export async function me(): Promise<AuthUser> {
   }
   return res as AuthUser;
 }
+
+export interface UpdateProfilePayload {
+  displayName?: string;
+  currentPassword?: string;
+  newPassword?: string;
+}
+
+export async function updateProfile(payload: UpdateProfilePayload): Promise<AuthUser> {
+  const res = await api<{ user: AuthUser }>("/auth/profile", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  return res.user;
+}

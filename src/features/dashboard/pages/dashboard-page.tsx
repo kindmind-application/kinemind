@@ -10,8 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router";
 import {
   getStats, getSectors, getGrowth, getDeviceStatus, dashboardKeys,
+  getSalesPipeline, getInventoryAlerts, getBatchYield,
 } from "@/lib/api/dashboard";
 import { listCompanies, companiesKeys } from "@/lib/api/companies";
+import { QUOTE_STATUS_LABEL, type QuoteStatus } from "@/lib/api/sales";
 
 const COLORS = ["#1e3a8a", "#3b82f6", "#60a5fa", "#93c5fd"];
 const GROWTH_MONTHS = 12;
@@ -48,6 +50,29 @@ export function DashboardPage() {
   }));
 
   const topCompanies = topCompaniesQuery.data?.items ?? [];
+
+  const salesPipelineQuery = useQuery({
+    queryKey: dashboardKeys.salesPipeline,
+    queryFn: getSalesPipeline,
+  });
+  const inventoryAlertsQuery = useQuery({
+    queryKey: dashboardKeys.inventoryAlerts(true),
+    queryFn: () => getInventoryAlerts(true),
+  });
+  const batchYieldQuery = useQuery({
+    queryKey: dashboardKeys.batchYield(10),
+    queryFn: () => getBatchYield(10),
+  });
+
+  const salesPipelineData = (salesPipelineQuery.data ?? []).map((p) => ({
+    status: QUOTE_STATUS_LABEL[p.status as QuoteStatus] ?? p.status,
+    count: p.count,
+  }));
+  const inventoryAlerts = inventoryAlertsQuery.data ?? [];
+  const batchYieldData = (batchYieldQuery.data ?? []).map((b) => ({
+    batchCode: b.batchCode,
+    yieldPct: b.yieldPct,
+  }));
 
   return (
     <div className="p-6 space-y-6 bg-gray-50">
@@ -253,6 +278,68 @@ export function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Sales + Operations Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader className="border-b border-gray-100 pb-4">
+            <CardTitle className="text-base font-semibold">Pipeline de ventas</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={salesPipelineData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="status" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="border-b border-gray-100 pb-4">
+            <CardTitle className="text-base font-semibold">Estado de inventario</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            {inventoryAlerts.length === 0 ? (
+              <p className="text-sm text-gray-500">Sin alertas de stock bajo</p>
+            ) : (
+              <ul className="space-y-3 max-h-60 overflow-y-auto">
+                {inventoryAlerts.map((a) => (
+                  <li key={a.sku} className="flex items-center justify-between text-sm border-b pb-2 last:border-0">
+                    <div>
+                      <p className="font-medium text-gray-900">{a.sku}</p>
+                      <p className="text-xs text-gray-500">{a.name}</p>
+                    </div>
+                    <Badge variant="destructive" className="text-xs">
+                      {a.onHand} / {a.reorderPoint}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="border-b border-gray-100 pb-4">
+            <CardTitle className="text-base font-semibold">Producción mensual (yield)</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={batchYieldData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="batchCode" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 12 }} domain={[0, 100]} />
+                <Tooltip formatter={(v) => `${v}%`} />
+                <Bar dataKey="yieldPct" fill="#10b981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
