@@ -205,8 +205,9 @@ function CreateContractDialog({
   open, onOpenChange, companies,
 }: { open: boolean; onOpenChange: (o: boolean) => void; companies: { id: string; name: string }[] }) {
   const queryClient = useQueryClient();
+  const today = new Date().toISOString().split("T")[0];
   const [companyId, setCompanyId] = useState("");
-  const [startDate, setStartDate] = useState("");
+  const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState("");
   const [totalValue, setTotalValue] = useState(0);
   const [paymentTerms, setPaymentTerms] = useState("");
@@ -217,7 +218,7 @@ function CreateContractDialog({
       toast.success("Contrato creado");
       queryClient.invalidateQueries({ queryKey: contractsKeys.all });
       onOpenChange(false);
-      setCompanyId(""); setStartDate(""); setEndDate(""); setTotalValue(0); setPaymentTerms("");
+      setCompanyId(""); setStartDate(today); setEndDate(""); setTotalValue(0); setPaymentTerms("");
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : "Error"),
   });
@@ -260,9 +261,10 @@ function CreateContractDialog({
           <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
           <Button onClick={() => {
             if (!companyId) { toast.error("Selecciona una empresa"); return; }
+            if (!startDate) { toast.error("Selecciona una fecha de inicio"); return; }
             mutation.mutate({
               companyId,
-              startDate: startDate || undefined,
+              startDate,
               endDate: endDate || undefined,
               totalValue,
               paymentTerms: paymentTerms || undefined,
