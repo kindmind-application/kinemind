@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Eye, MoreVertical, XCircle } from "lucide-react";
+import { Plus, Search, Eye, MoreVertical, XCircle, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -20,8 +20,8 @@ import { DataTable } from "@/components/shared/data-table";
 import { toast } from "sonner";
 import { listCompanies, companiesKeys } from "@/lib/api/companies";
 import {
-  listContracts, getContract, createContract, terminateContract,
-  contractsKeys,
+  listContracts, getContract, createContract, terminateContract, updateContract,
+  getQuote, quotesKeys, contractsKeys,
   CONTRACT_STATUS_LABEL, contractStatusVariant, formatCOP,
   type Contract, type ContractStatus, type SalesListParams,
 } from "@/lib/api/sales";
@@ -38,6 +38,7 @@ export function ContractsTab() {
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
 
   const filters: SalesListParams = {
     q: searchTerm || undefined,
@@ -133,6 +134,9 @@ export function ContractsTab() {
             <DropdownMenuItem onClick={() => setDetailId(c.id)}>
               <Eye className="w-4 h-4 mr-2" />Ver detalle
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setEditId(c.id)}>
+              <Edit className="w-4 h-4 mr-2" />Editar
+            </DropdownMenuItem>
             {c.status === "active" && (
               <DropdownMenuItem onClick={() => terminateMutation.mutate(c.id)}>
                 <XCircle className="w-4 h-4 mr-2" />Terminar
@@ -197,6 +201,7 @@ export function ContractsTab() {
 
       <CreateContractDialog open={createOpen} onOpenChange={setCreateOpen} companies={companies} />
       <ContractDetailSheet id={detailId} onOpenChange={(o) => !o && setDetailId(null)} />
+      <EditContractDialog id={editId} onOpenChange={(o) => !o && setEditId(null)} />
     </div>
   );
 }
@@ -283,6 +288,105 @@ function CreateContractDialog({
   );
 }
 
+function EditContractDialog({
+  id,
+  onOpenChange,
+}: {
+  id: string | null;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey: contractsKeys.detail(id ?? ""),
+    queryFn: () => getContract(id!),
+    enabled: !!id,
+  });
+  const c = query.data;
+
+  const [status, setStatus] = useState<ContractStatus>("draft");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [totalValue, setTotalValue] = useState(0);
+  const [paymentTerms, setPaymentTerms] = useState("");
+
+  useEffect(() => {
+    if (c) {
+      setStatus(c.status);
+      setStartDate(c.startDate ?? "");
+      setEndDate(c.endDate ?? "");
+      setTotalValue(c.totalValue);
+      setPaymentTerms(c.paymentTerms ?? "");
+    }
+  }, [c]);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      updateContract(id!, {
+        status,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        totalValue,
+        paymentTerms: paymentTerms || undefined,
+      }),
+    onSuccess: () => {
+      toast.success("Contrato actualizado");
+      queryClient.invalidateQueries({ queryKey: contractsKeys.all });
+      onOpenChange(false);
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Error"),
+  });
+
+  return (
+    <Dialog open={!!id} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Editar contrato</DialogTitle></DialogHeader>
+        {!c ? <p className="py-4 text-sm text-gray-500">Cargando...</p> : (
+          <div className="space-y-4">
+            <div>
+              <Label>Estado</Label>
+              <Select value={status} onValueChange={(v) => setStatus(v as ContractStatus)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">Borrador</SelectItem>
+                  <SelectItem value="active">Activo</SelectItem>
+                  <SelectItem value="expired">Expirado</SelectItem>
+                  <SelectItem value="terminated">Terminado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Inicio</Label>
+                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              </div>
+              <div>
+                <Label>Fin</Label>
+                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <Label>Valor total (COP)</Label>
+              <Input type="number" min="0" value={totalValue}
+                onChange={(e) => setTotalValue(Number(e.target.value))} />
+            </div>
+            <div>
+              <Label>Términos de pago</Label>
+              <Input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} />
+            </div>
+          </div>
+        )}
+        <DialogFooter>
+          <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
+          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || !c}
+            className="bg-[#1e3a8a] hover:bg-[#1e40af]">
+            {mutation.isPending ? "Guardando..." : "Guardar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ContractDetailSheet({ id, onOpenChange }: { id: string | null; onOpenChange: (o: boolean) => void }) {
   const query = useQuery({
     queryKey: contractsKeys.detail(id ?? ""),
@@ -290,6 +394,14 @@ function ContractDetailSheet({ id, onOpenChange }: { id: string | null; onOpenCh
     enabled: !!id,
   });
   const c = query.data;
+
+  const quoteQuery = useQuery({
+    queryKey: quotesKeys.detail(c?.quoteId ?? ""),
+    queryFn: () => getQuote(c!.quoteId!),
+    enabled: !!c?.quoteId,
+  });
+  const quote = quoteQuery.data;
+
   return (
     <Sheet open={!!id} onOpenChange={onOpenChange}>
       <SheetContent>
@@ -314,6 +426,33 @@ function ContractDetailSheet({ id, onOpenChange }: { id: string | null; onOpenCh
             </div>
             {c.paymentTerms && (
               <div><Label className="text-gray-500">Términos</Label><p>{c.paymentTerms}</p></div>
+            )}
+            {quote?.items && quote.items.length > 0 && (
+              <div>
+                <Label className="text-gray-500">Líneas</Label>
+                <table className="w-full mt-2 text-xs border">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-2 py-1 text-left">SKU</th>
+                      <th className="px-2 py-1 text-left">Descripción</th>
+                      <th className="px-2 py-1 text-right">Qty</th>
+                      <th className="px-2 py-1 text-right">Precio</th>
+                      <th className="px-2 py-1 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quote.items.map((it) => (
+                      <tr key={it.lineNo} className="border-t">
+                        <td className="px-2 py-1">{it.sku}</td>
+                        <td className="px-2 py-1">{it.description}</td>
+                        <td className="px-2 py-1 text-right">{it.quantity}</td>
+                        <td className="px-2 py-1 text-right">{formatCOP(it.unitPrice)}</td>
+                        <td className="px-2 py-1 text-right">{formatCOP(it.lineTotal)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
             {c.signedAt && (
               <div><Label className="text-gray-500">Firmado</Label>

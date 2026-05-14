@@ -265,9 +265,9 @@ function CreateOrderDialog({
             </Select>
           </div>
           <div>
-            <Label>Contrato (opcional)</Label>
+            <Label>Contrato</Label>
             <Select value={contractId} onValueChange={setContractId} disabled={!companyId}>
-              <SelectTrigger><SelectValue placeholder="Sin contrato" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Selecciona contrato" /></SelectTrigger>
               <SelectContent>
                 {contracts.map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.id.slice(0, 8)} — {c.totalValue}</SelectItem>
@@ -290,9 +290,10 @@ function CreateOrderDialog({
           <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
           <Button onClick={() => {
             if (!companyId) { toast.error("Selecciona una empresa"); return; }
+            if (!contractId) { toast.error("Selecciona un contrato"); return; }
             mutation.mutate({
               companyId,
-              contractId: contractId || undefined,
+              contractId,
               requestedDevices,
               requestedDeliveryDate: requestedDeliveryDate || undefined,
               status: "pending",
