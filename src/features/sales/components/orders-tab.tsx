@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Eye, MoreVertical, Ban } from "lucide-react";
+import { Plus, Search, Eye, MoreVertical, Ban, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -20,12 +20,19 @@ import { DataTable } from "@/components/shared/data-table";
 import { toast } from "sonner";
 import { listCompanies, companiesKeys } from "@/lib/api/companies";
 import {
-  listOrders, getOrder, createOrder, cancelOrder,
+  listOrders, getOrder, createOrder, cancelOrder, updateOrder,
   listContracts, contractsKeys,
   ordersKeys,
   ORDER_STATUS_LABEL, orderStatusVariant,
   type Order, type OrderStatus, type SalesListParams,
 } from "@/lib/api/sales";
+
+const ORDER_STATUS_NEXT: Partial<Record<OrderStatus, OrderStatus>> = {
+  pending: "in_production",
+  in_production: "ready_to_ship",
+  ready_to_ship: "shipped",
+  shipped: "delivered",
+};
 import { ApiError } from "@/lib/api/client";
 
 const PAGE_SIZE = 20;
@@ -70,6 +77,16 @@ export function OrdersTab() {
     mutationFn: cancelOrder,
     onSuccess: () => {
       toast.success("Pedido cancelado");
+      queryClient.invalidateQueries({ queryKey: ordersKeys.all });
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Error"),
+  });
+
+  const advanceMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: OrderStatus }) =>
+      updateOrder(id, { status }),
+    onSuccess: () => {
+      toast.success("Estado actualizado");
       queryClient.invalidateQueries({ queryKey: ordersKeys.all });
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : "Error"),
@@ -130,6 +147,14 @@ export function OrdersTab() {
             <DropdownMenuItem onClick={() => setDetailId(o.id)}>
               <Eye className="w-4 h-4 mr-2" />Ver detalle
             </DropdownMenuItem>
+            {ORDER_STATUS_NEXT[o.status] && (
+              <DropdownMenuItem onClick={() =>
+                advanceMutation.mutate({ id: o.id, status: ORDER_STATUS_NEXT[o.status]! })
+              }>
+                <ArrowRight className="w-4 h-4 mr-2" />
+                {ORDER_STATUS_LABEL[ORDER_STATUS_NEXT[o.status]!]}
+              </DropdownMenuItem>
+            )}
             {o.status !== "cancelled" && o.status !== "delivered" && (
               <DropdownMenuItem onClick={() => cancelMutation.mutate(o.id)}>
                 <Ban className="w-4 h-4 mr-2" />Cancelar

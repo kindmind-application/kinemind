@@ -91,6 +91,7 @@ export function QuotesTab() {
         companyId: q.companyId,
         quoteId: q.id,
         totalValue: q.total,
+        startDate: new Date().toISOString().split("T")[0],
         status: "draft",
       });
     },

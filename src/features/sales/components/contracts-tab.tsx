@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Eye, MoreVertical, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -212,13 +212,17 @@ function CreateContractDialog({
   const [totalValue, setTotalValue] = useState(0);
   const [paymentTerms, setPaymentTerms] = useState("");
 
+  useEffect(() => {
+    if (open) setStartDate(new Date().toISOString().split("T")[0]);
+  }, [open]);
+
   const mutation = useMutation({
     mutationFn: createContract,
     onSuccess: () => {
       toast.success("Contrato creado");
       queryClient.invalidateQueries({ queryKey: contractsKeys.all });
       onOpenChange(false);
-      setCompanyId(""); setStartDate(today); setEndDate(""); setTotalValue(0); setPaymentTerms("");
+      setCompanyId(""); setStartDate(new Date().toISOString().split("T")[0]); setEndDate(""); setTotalValue(0); setPaymentTerms("");
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : "Error"),
   });
