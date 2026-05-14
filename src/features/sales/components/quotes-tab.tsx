@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Eye, MoreVertical, Send, CheckCircle2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,8 +27,9 @@ import {
   quotesKeys, contractsKeys,
   QUOTE_STATUS_LABEL, quoteStatusVariant, formatCOP,
   createContract,
-  type Quote, type QuoteStatus, type SalesListParams,
+  type Quote, type QuoteStatus, type ContractStatus, type SalesListParams,
 } from "@/lib/api/sales";
+import { listInventory, inventoryKeys } from "@/lib/api/operations";
 import { ApiError } from "@/lib/api/client";
 
 const PAGE_SIZE = 20;
@@ -42,6 +43,7 @@ export function QuotesTab() {
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [contractFromQuote, setContractFromQuote] = useState<Quote | null>(null);
 
   const filters: SalesListParams = {
     q: searchTerm || undefined,
@@ -81,23 +83,6 @@ export function QuotesTab() {
     onSuccess: () => {
       toast.success("Cotización aceptada");
       queryClient.invalidateQueries({ queryKey: quotesKeys.all });
-    },
-    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Error"),
-  });
-
-  const toContractMutation = useMutation({
-    mutationFn: async (q: Quote) => {
-      return createContract({
-        companyId: q.companyId,
-        quoteId: q.id,
-        totalValue: q.total,
-        startDate: new Date().toISOString().split("T")[0],
-        status: "draft",
-      });
-    },
-    onSuccess: () => {
-      toast.success("Contrato creado desde cotización");
-      queryClient.invalidateQueries({ queryKey: contractsKeys.all });
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : "Error"),
   });
@@ -174,7 +159,7 @@ export function QuotesTab() {
               </DropdownMenuItem>
             )}
             {q.status === "accepted" && (
-              <DropdownMenuItem onClick={() => toContractMutation.mutate(q)}>
+              <DropdownMenuItem onClick={() => setContractFromQuote(q)}>
                 <FileText className="w-4 h-4 mr-2" />
                 Crear contrato
               </DropdownMenuItem>
@@ -242,6 +227,7 @@ export function QuotesTab() {
 
       <CreateQuoteDialog open={createOpen} onOpenChange={setCreateOpen} companies={companies} />
       <QuoteDetailSheet id={detailId} onOpenChange={(o) => !o && setDetailId(null)} />
+      <CreateContractFromQuoteDialog quote={contractFromQuote} onOpenChange={(o) => !o && setContractFromQuote(null)} />
     </div>
   );
 }
@@ -261,6 +247,11 @@ interface DraftLine {
 
 function CreateQuoteDialog({ open, onOpenChange, companies }: CreateQuoteDialogProps) {
   const queryClient = useQueryClient();
+  const inventoryQuery = useQuery({
+    queryKey: inventoryKeys.list(),
+    queryFn: listInventory,
+  });
+  const inventoryItems = inventoryQuery.data?.items ?? [];
   const [companyId, setCompanyId] = useState("");
   const [validUntil, setValidUntil] = useState("");
   const [notes, setNotes] = useState("");
@@ -338,8 +329,26 @@ function CreateQuoteDialog({ open, onOpenChange, companies }: CreateQuoteDialogP
               {lines.map((l, i) => (
                 <div key={i} className="grid grid-cols-12 gap-2 items-end">
                   <div className="col-span-2">
-                    <Input placeholder="SKU" value={l.sku}
-                      onChange={(e) => updateLine(i, { sku: e.target.value })} />
+                    <Select
+                      value={l.sku}
+                      onValueChange={(sku) => {
+                        const item = inventoryItems.find((it) => it.sku === sku);
+                        updateLine(i, {
+                          sku,
+                          description: item ? item.name : l.description,
+                          unitPrice: item ? item.unitCost : l.unitPrice,
+                        });
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder="SKU" /></SelectTrigger>
+                      <SelectContent>
+                        {inventoryItems.map((it) => (
+                          <SelectItem key={it.sku} value={it.sku}>
+                            {it.sku} — {it.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="col-span-4">
                     <Input placeholder="Descripción" value={l.description}
@@ -377,6 +386,89 @@ function CreateQuoteDialog({ open, onOpenChange, companies }: CreateQuoteDialogP
           <Button onClick={handleSubmit} disabled={mutation.isPending}
             className="bg-[#1e3a8a] hover:bg-[#1e40af]">
             {mutation.isPending ? "Creando..." : "Crear"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CreateContractFromQuoteDialog({
+  quote,
+  onOpenChange,
+}: {
+  quote: Quote | null;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const today = new Date().toISOString().split("T")[0];
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState("");
+  const [status, setStatus] = useState<ContractStatus>("draft");
+
+  useEffect(() => {
+    if (quote) {
+      setStartDate(new Date().toISOString().split("T")[0]);
+      setEndDate("");
+      setStatus("draft");
+    }
+  }, [quote]);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      createContract({
+        companyId: quote!.companyId,
+        quoteId: quote!.id,
+        totalValue: quote!.total,
+        startDate,
+        endDate: endDate || undefined,
+        status,
+      }),
+    onSuccess: () => {
+      toast.success("Contrato creado desde cotización");
+      queryClient.invalidateQueries({ queryKey: contractsKeys.all });
+      onOpenChange(false);
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Error"),
+  });
+
+  return (
+    <Dialog open={!!quote} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Crear contrato desde cotización</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Inicio</Label>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </div>
+            <div>
+              <Label>Fin (opcional)</Label>
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <Label>Estado</Label>
+            <Select value={status} onValueChange={(v) => setStatus(v as ContractStatus)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="draft">Borrador</SelectItem>
+                <SelectItem value="active">Activo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
+          <Button
+            onClick={() => {
+              if (!startDate) { toast.error("Selecciona una fecha de inicio"); return; }
+              mutation.mutate();
+            }}
+            disabled={mutation.isPending}
+            className="bg-[#1e3a8a] hover:bg-[#1e40af]"
+          >
+            {mutation.isPending ? "Creando..." : "Crear contrato"}
           </Button>
         </DialogFooter>
       </DialogContent>
