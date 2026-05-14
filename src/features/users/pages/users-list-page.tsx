@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Search } from "lucide-react";
+import { Edit, Plus, Search, Watch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -95,6 +95,35 @@ export function UsersListPage() {
         ) : (
           <span className="text-xs text-gray-400">Sin asignar</span>
         ),
+    },
+    {
+      key: "actions",
+      header: "",
+      className: "text-right",
+      render: (user: User) => (
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/users/${user.id}/edit`)}
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            Editar
+          </Button>
+          <Button
+            size="sm"
+            className="bg-[#1e3a8a] hover:bg-[#1e40af]"
+            onClick={() =>
+              navigate(
+                `/devices/assign?employeeId=${user.id}${user.companyId ? `&companyId=${user.companyId}` : ""}`
+              )
+            }
+          >
+            <Watch className="w-4 h-4 mr-2" />
+            Asignar
+          </Button>
+        </div>
+      ),
     },
   ];
 

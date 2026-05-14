@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router";
 import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,10 +11,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/shared/page-header";
 import { listCompanies, companiesKeys } from "@/lib/api/companies";
-import { createEmployee, employeesKeys } from "@/lib/api/employees";
+import { createEmployee, getEmployee, updateEmployee, employeesKeys } from "@/lib/api/employees";
 import { ApiError } from "@/lib/api/client";
 
 export function UserRegisterPage() {
+  const { id } = useParams();
+  const isEdit = Boolean(id);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -34,15 +36,48 @@ export function UserRegisterPage() {
     queryFn: () => listCompanies({ pageSize: 100, sort: "name:asc" }),
   });
 
+  const employeeQuery = useQuery({
+    queryKey: employeesKeys.detail(id ?? ""),
+    queryFn: () => getEmployee(id!),
+    enabled: isEdit,
+  });
+
+  useEffect(() => {
+    if (!employeeQuery.data) return;
+    const employee = employeeQuery.data;
+    const [first, ...rest] = (employee.name ?? "").split(" ");
+    setFirstName(first ?? "");
+    setLastName(rest.join(" "));
+    setDocumentNumber(employee.document ?? "");
+    setCompanyId(employee.companyId ?? "");
+    setPosition(employee.position ?? "");
+    setArea(employee.area ?? "");
+    setEmail(employee.email ?? "");
+    setPhone(employee.phone ?? "");
+    setStatus(employee.status ?? "Activo");
+  }, [employeeQuery.data]);
+
   const mutation = useMutation({
-    mutationFn: createEmployee,
+    mutationFn: (payload: Partial<Record<string, string>>) =>
+      isEdit ? updateEmployee(id!, payload) : createEmployee(payload),
     onSuccess: () => {
-      toast.success("Usuario registrado exitosamente");
+      if (isEdit) {
+        toast.success("Usuario actualizado exitosamente");
+      } else {
+        toast.success("Usuario registrado exitosamente");
+      }
       queryClient.invalidateQueries({ queryKey: employeesKeys.all });
+      if (isEdit) {
+        queryClient.invalidateQueries({ queryKey: employeesKeys.detail(id!) });
+      }
       navigate("/users");
     },
     onError: (err) => {
-      const msg = err instanceof ApiError ? err.message : "Error al registrar usuario";
+      const msg = err instanceof ApiError
+        ? err.message
+        : isEdit
+          ? "Error al actualizar usuario"
+          : "Error al registrar usuario";
       toast.error(msg);
     },
   });
@@ -53,7 +88,7 @@ export function UserRegisterPage() {
       toast.error("Debe seleccionar una empresa");
       return;
     }
-    mutation.mutate({
+    const payload: Partial<Record<string, string>> = {
       companyId,
       name: `${firstName} ${lastName}`.trim(),
       document: documentNumber,
@@ -62,11 +97,29 @@ export function UserRegisterPage() {
       email,
       phone,
       status,
-      joinDate: new Date().toISOString().slice(0, 10),
-    });
+    } as Record<string, string>;
+
+    if (!isEdit) {
+      payload.joinDate = new Date().toISOString().slice(0, 10);
+    }
+
+    mutation.mutate(payload);
   };
 
   const companies = companiesQuery.data?.items ?? [];
+
+  if (isEdit && employeeQuery.isLoading) {
+    return <div className="p-6 text-center py-12 text-gray-500">Cargando...</div>;
+  }
+
+  if (isEdit && !employeeQuery.data) {
+    return (
+      <div className="p-6 text-center py-12">
+        <p className="text-gray-500">Usuario no encontrado</p>
+        <Button onClick={() => navigate("/users")} className="mt-4">Volver a usuarios</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-50 min-h-full p-6">
@@ -76,7 +129,10 @@ export function UserRegisterPage() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver
           </Button>
-          <PageHeader title="Registrar Nuevo Usuario" description="Complete los datos del empleado para crear su perfil en el sistema." />
+          <PageHeader
+            title={isEdit ? "Editar Usuario" : "Registrar Nuevo Usuario"}
+            description={isEdit ? "Actualice los datos del empleado en el sistema." : "Complete los datos del empleado para crear su perfil en el sistema."}
+          />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -193,7 +249,7 @@ export function UserRegisterPage() {
             <Button type="button" variant="outline" onClick={() => navigate(-1)}>Cancelar</Button>
             <Button type="submit" className="bg-[#1e3a8a] hover:bg-[#1e40af]" disabled={mutation.isPending}>
               <Save className="w-4 h-4 mr-2" />
-              {mutation.isPending ? "Guardando..." : "Registrar Usuario"}
+              {mutation.isPending ? "Guardando..." : isEdit ? "Guardar cambios" : "Registrar Usuario"}
             </Button>
           </div>
         </form>

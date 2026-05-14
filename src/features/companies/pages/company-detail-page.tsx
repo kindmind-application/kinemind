@@ -168,7 +168,9 @@ export function CompanyDetailPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm"><Edit className="w-4 h-4 mr-2" />Editar</Button>
+            <Link to={`/companies/${company.id}/edit`}>
+              <Button variant="outline" size="sm"><Edit className="w-4 h-4 mr-2" />Editar</Button>
+            </Link>
             <Link to="/users/register">
               <Button variant="outline" size="sm"><UserPlus className="w-4 h-4 mr-2" />Nuevo Usuario</Button>
             </Link>

@@ -137,7 +137,7 @@ export function CompaniesListPage() {
               <Eye className="w-4 h-4 mr-2" />
               Ver detalle
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate(`/companies/${company.id}`)}>
+            <DropdownMenuItem onClick={() => navigate(`/companies/${company.id}/edit`)}>
               <Edit className="w-4 h-4 mr-2" />
               Editar
             </DropdownMenuItem>

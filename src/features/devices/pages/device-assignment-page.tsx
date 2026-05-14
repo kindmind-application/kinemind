@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Save, Watch, Wrench, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -17,11 +17,14 @@ import { ApiError } from "@/lib/api/client";
 
 export function DeviceAssignmentPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const presetCompanyId = searchParams.get("companyId") ?? "";
+  const presetEmployeeId = searchParams.get("employeeId") ?? "";
   const queryClient = useQueryClient();
   const [deviceSearch, setDeviceSearch] = useState("");
   const [deviceId, setDeviceId] = useState<string>("");
-  const [companyId, setCompanyId] = useState<string>("");
-  const [employeeId, setEmployeeId] = useState<string>("");
+  const [companyId, setCompanyId] = useState<string>(presetCompanyId);
+  const [employeeId, setEmployeeId] = useState<string>(presetEmployeeId);
 
   const availableDevicesQuery = useQuery({
     queryKey: devicesKeys.list({ status: "Disponible", pageSize: 100 }),
@@ -121,7 +124,14 @@ export function DeviceAssignmentPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="company">Empresa *</Label>
-                      <Select value={companyId} onValueChange={(v) => { setCompanyId(v); setEmployeeId(""); }} required>
+                      <Select
+                        value={companyId}
+                        onValueChange={(v) => {
+                          setCompanyId(v);
+                          if (v !== companyId) setEmployeeId("");
+                        }}
+                        required
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccione empresa" />
                         </SelectTrigger>

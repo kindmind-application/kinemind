@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
-import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router";
 import { ArrowLeft, Save, Building2, User, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,11 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createCompany, companiesKeys } from "@/lib/api/companies";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createCompany, getCompany, updateCompany, companiesKeys } from "@/lib/api/companies";
 import { ApiError } from "@/lib/api/client";
 
 export function CompanyRegisterPage() {
+  const { id } = useParams();
+  const isEdit = Boolean(id);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
@@ -34,22 +36,63 @@ export function CompanyRegisterPage() {
     observations: "",
   });
 
+  const companyQuery = useQuery({
+    queryKey: companiesKeys.detail(id ?? ""),
+    queryFn: () => getCompany(id!),
+    enabled: isEdit,
+  });
+
+  useEffect(() => {
+    if (!companyQuery.data) return;
+    const company = companyQuery.data;
+    setFormData({
+      name: company.name ?? "",
+      nit: company.nit ?? "",
+      sector: company.sector ?? "",
+      size: company.size ?? "",
+      city: company.city ?? "",
+      address: company.address ?? "",
+      phone: company.phone ?? "",
+      email: company.email ?? "",
+      contactName: company.contactName ?? "",
+      contactPosition: company.contactPosition ?? "",
+      contactEmail: "",
+      contactPhone: "",
+      status: company.status ?? "Activa",
+      observations: company.observations ?? "",
+    });
+  }, [companyQuery.data]);
+
   const mutation = useMutation({
-    mutationFn: createCompany,
+    mutationFn: (payload: Partial<Record<string, string>>) => {
+      if (isEdit) return updateCompany(id!, payload);
+      return createCompany(payload);
+    },
     onSuccess: () => {
+      if (isEdit) {
+        toast.success("Empresa actualizada exitosamente");
+        queryClient.invalidateQueries({ queryKey: companiesKeys.detail(id!) });
+        queryClient.invalidateQueries({ queryKey: companiesKeys.all });
+        navigate(`/companies/${id}`);
+        return;
+      }
       toast.success("Empresa registrada exitosamente");
       queryClient.invalidateQueries({ queryKey: companiesKeys.all });
       navigate("/companies");
     },
     onError: (err) => {
-      const msg = err instanceof ApiError ? err.message : "Error al registrar empresa";
+      const msg = err instanceof ApiError
+        ? err.message
+        : isEdit
+          ? "Error al actualizar empresa"
+          : "Error al registrar empresa";
       toast.error(msg);
     },
   });
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    mutation.mutate({
+    const payload: Partial<Record<string, string>> = {
       name: formData.name,
       nit: formData.nit,
       sector: formData.sector,
@@ -62,17 +105,38 @@ export function CompanyRegisterPage() {
       contactPosition: formData.contactPosition,
       status: formData.status,
       observations: formData.observations,
-      registrationDate: new Date().toISOString().slice(0, 10),
-    });
+    } as Record<string, string>;
+
+    if (!isEdit) {
+      payload.registrationDate = new Date().toISOString().slice(0, 10);
+    }
+
+    mutation.mutate(payload);
   };
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }) as typeof prev);
   };
 
+  if (isEdit && companyQuery.isLoading) {
+    return <div className="p-6 text-center py-12 text-gray-500">Cargando...</div>;
+  }
+
+  if (isEdit && !companyQuery.data) {
+    return (
+      <div className="p-6 text-center py-12">
+        <p className="text-gray-500">Empresa no encontrada</p>
+        <Button onClick={() => navigate("/companies")} className="mt-4">Volver a empresas</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-gray-50 min-h-full">
-      <PageHeader title="Registrar Nueva Empresa" description="Complete la información de la empresa cliente" />
+      <PageHeader
+        title={isEdit ? "Editar Empresa" : "Registrar Nueva Empresa"}
+        description={isEdit ? "Actualice la información de la empresa cliente" : "Complete la información de la empresa cliente"}
+      />
 
       <div className="p-6">
         <form onSubmit={handleSubmit} className="max-w-5xl mx-auto space-y-6">
@@ -201,13 +265,18 @@ export function CompanyRegisterPage() {
           </Card>
 
           <div className="flex gap-3 justify-end pt-4 pb-6">
-            <Button type="button" variant="outline" onClick={() => navigate("/companies")} className="min-w-32">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate(isEdit ? `/companies/${id}` : "/companies")}
+              className="min-w-32"
+            >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Cancelar
             </Button>
             <Button type="submit" className="bg-[#1e3a8a] hover:bg-[#1e40af] min-w-32" disabled={mutation.isPending}>
               <Save className="w-4 h-4 mr-2" />
-              {mutation.isPending ? "Guardando..." : "Guardar"}
+              {mutation.isPending ? "Guardando..." : isEdit ? "Guardar cambios" : "Guardar"}
             </Button>
           </div>
         </form>

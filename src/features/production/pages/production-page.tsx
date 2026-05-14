@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Search, Eye, MoreVertical, Play, ClipboardCheck, CheckCircle2, Ban,
@@ -26,7 +26,7 @@ import { DataTable } from "@/components/shared/data-table";
 import { toast } from "sonner";
 import {
   listBatches, getBatch, createBatch,
-  startBatch, qaBatch, completeBatch, cancelBatch,
+  startBatch, qaBatch, completeBatch, cancelBatch, updateBatch,
   batchesKeys,
   BATCH_STATUS_LABEL, batchStatusVariant,
   type Batch, type BatchStatus, type BatchListParams,
@@ -46,6 +46,10 @@ export function ProductionPage() {
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [completeOpen, setCompleteOpen] = useState(false);
+  const [completeId, setCompleteId] = useState<string | null>(null);
+  const [completeQtyProduced, setCompleteQtyProduced] = useState<number>(0);
+  const [completeQtyPassedQa, setCompleteQtyPassedQa] = useState<number>(0);
 
   const filters: BatchListParams = {
     q: searchTerm || undefined,
@@ -213,7 +217,14 @@ export function ProductionPage() {
             )}
             {b.status === "qa" && (
               <>
-                <DropdownMenuItem onClick={() => completeMutation.mutate(b.id)}>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setCompleteId(b.id);
+                    setCompleteQtyProduced(b.quantityProduced ?? 0);
+                    setCompleteQtyPassedQa(b.quantityPassedQa ?? 0);
+                    setCompleteOpen(true);
+                  }}
+                >
                   <CheckCircle2 className="w-4 h-4 mr-2" />Completar
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => cancelMutation.mutate(b.id)}>
@@ -286,7 +297,92 @@ export function ProductionPage() {
 
       <CreateBatchDialog open={createOpen} onOpenChange={setCreateOpen} />
       <BatchDetailSheet id={detailId} onOpenChange={(o) => !o && setDetailId(null)} />
+      <CompleteBatchDialog
+        open={completeOpen}
+        id={completeId}
+        quantityProduced={completeQtyProduced}
+        quantityPassedQa={completeQtyPassedQa}
+        onOpenChange={(o) => {
+          if (!o) setCompleteId(null);
+          setCompleteOpen(o);
+        }}
+        onConfirm={async (id, produced, passed) => {
+          try {
+            await updateBatch(id, { quantityProduced: produced, quantityPassedQa: passed });
+          } catch (err) {
+            toast.error(err instanceof ApiError ? err.message : "No se pudo actualizar el lote");
+            return false;
+          }
+          completeMutation.mutate(id);
+          return true;
+        }}
+      />
     </div>
+  );
+}
+
+function CompleteBatchDialog({
+  open,
+  id,
+  quantityProduced,
+  quantityPassedQa,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  id: string | null;
+  quantityProduced: number;
+  quantityPassedQa: number;
+  onOpenChange: (o: boolean) => void;
+  onConfirm: (id: string, produced: number, passed: number) => Promise<boolean>;
+}) {
+  const [produced, setProduced] = useState<number>(quantityProduced);
+  const [passed, setPassed] = useState<number>(quantityPassedQa);
+
+  useEffect(() => {
+    if (open) {
+      setProduced(quantityProduced);
+      setPassed(quantityPassedQa);
+    }
+  }, [open, id, quantityProduced, quantityPassedQa]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Completar lote</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>Cantidad producida</Label>
+            <Input type="number" min={0} value={produced} onChange={(e) => setProduced(Number(e.target.value))} />
+          </div>
+          <div>
+            <Label>Cantidad aprobada en QA</Label>
+            <Input type="number" min={0} value={passed} onChange={(e) => setPassed(Number(e.target.value))} />
+          </div>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancelar</Button>
+          </DialogClose>
+          <Button
+            onClick={async () => {
+              if (!id) return;
+              if (!Number.isInteger(produced) || produced < 0 || !Number.isInteger(passed) || passed < 0) {
+                toast.error("Valores inválidos");
+                return;
+              }
+              const ok = await onConfirm(id, produced, passed);
+              if (ok) onOpenChange(false);
+            }}
+            className="bg-[#1e3a8a] hover:bg-[#1e40af]"
+          >
+            Completar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
