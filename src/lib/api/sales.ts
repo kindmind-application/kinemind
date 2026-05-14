@@ -178,8 +178,7 @@ export function getOrder(id: string): Promise<Order> {
 }
 
 export interface CreateOrderInput {
-  contractId?: string;
-  companyId: string;
+  contractId: string;
   status?: OrderStatus;
   requestedDevices: number;
   requestedDeliveryDate?: string;

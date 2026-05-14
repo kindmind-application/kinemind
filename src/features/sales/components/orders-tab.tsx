@@ -292,7 +292,6 @@ function CreateOrderDialog({
             if (!companyId) { toast.error("Selecciona una empresa"); return; }
             if (!contractId) { toast.error("Selecciona un contrato"); return; }
             mutation.mutate({
-              companyId,
               contractId,
               requestedDevices,
               requestedDeliveryDate: requestedDeliveryDate || undefined,
