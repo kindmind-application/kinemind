@@ -12,12 +12,14 @@ import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
 import { listDevices, unassignDevice, devicesKeys } from "@/lib/api/devices";
 import { dashboardKeys } from "@/lib/api/dashboard";
+import { useRole } from "@/lib/auth/AuthContext";
 import type { Device } from "@/data/types";
 import { ApiError } from "@/lib/api/client";
 
 export function DevicesListPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isCompanyAdmin, companyId } = useRole();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
@@ -25,6 +27,7 @@ export function DevicesListPage() {
 
   const filters = {
     q: searchTerm || undefined,
+    companyId: isCompanyAdmin && companyId ? companyId : undefined,
     status: statusFilter === "all" ? undefined : statusFilter,
     page,
     pageSize,

@@ -10,10 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
 import { listEmployees, employeesKeys } from "@/lib/api/employees";
+import { useRole } from "@/lib/auth/AuthContext";
 import type { User } from "@/data/types";
 
 export function UsersListPage() {
   const navigate = useNavigate();
+  const { isCompanyAdmin, companyId } = useRole();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
@@ -21,6 +23,7 @@ export function UsersListPage() {
 
   const filters = {
     q: searchTerm || undefined,
+    companyId: isCompanyAdmin && companyId ? companyId : undefined,
     status: statusFilter === "all" ? undefined : statusFilter,
     page,
     pageSize,

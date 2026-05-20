@@ -14,6 +14,7 @@ import {
 } from "@/lib/api/dashboard";
 import { listCompanies, companiesKeys } from "@/lib/api/companies";
 import { QUOTE_STATUS_LABEL, type QuoteStatus } from "@/lib/api/sales";
+import { useRole } from "@/lib/auth/AuthContext";
 
 const COLORS = ["#1e3a8a", "#3b82f6", "#60a5fa", "#93c5fd"];
 const GROWTH_MONTHS = 12;
@@ -21,6 +22,7 @@ const GROWTH_MONTHS = 12;
 const MONTH_FORMATTER = new Intl.DateTimeFormat("es-CO", { month: "short" });
 
 export function DashboardPage() {
+  const { isCompanyAdmin, companyName } = useRole();
   const statsQuery = useQuery({ queryKey: dashboardKeys.stats, queryFn: getStats });
   const sectorsQuery = useQuery({ queryKey: dashboardKeys.sectors, queryFn: getSectors });
   const growthQuery = useQuery({ queryKey: dashboardKeys.growth(GROWTH_MONTHS), queryFn: () => getGrowth(GROWTH_MONTHS) });
@@ -78,17 +80,23 @@ export function DashboardPage() {
     <div className="p-6 space-y-6 bg-gray-50">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">Panel de Control</h1>
-        <p className="text-sm text-gray-500 mt-1">Vista general del sistema de gestión</p>
+        <p className="text-sm text-gray-500 mt-1">
+          {isCompanyAdmin && companyName
+            ? `Vista general de ${companyName}`
+            : "Vista general del sistema de gestión"}
+        </p>
       </div>
 
       {/* Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard
-          title="Empresas Activas"
-          value={activeCompanies}
-          icon={Building2}
-          iconColor="text-green-600"
-        />
+        {!isCompanyAdmin && (
+          <StatsCard
+            title="Empresas Activas"
+            value={activeCompanies}
+            icon={Building2}
+            iconColor="text-green-600"
+          />
+        )}
         <StatsCard
           title="Total Usuarios"
           value={totalUsers.toLocaleString()}
@@ -227,8 +235,8 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      {/* Top Companies */}
-      <Card>
+      {/* Top Companies — super_admin only */}
+      {!isCompanyAdmin && <Card>
         <CardHeader className="border-b border-gray-100 pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-semibold">Principales Empresas</CardTitle>
@@ -277,10 +285,10 @@ export function DashboardPage() {
             </table>
           </div>
         </CardContent>
-      </Card>
+      </Card>}
 
-      {/* Sales + Operations Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Sales + Operations Row — super_admin only */}
+      {!isCompanyAdmin && <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="border-b border-gray-100 pb-4">
             <CardTitle className="text-base font-semibold">Pipeline de ventas</CardTitle>
@@ -339,7 +347,7 @@ export function DashboardPage() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
-      </div>
+      </div>}
     </div>
   );
 }
