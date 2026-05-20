@@ -15,6 +15,8 @@ import { ProductionPage } from "@/features/production/pages/production-page";
 import { InventoryPage } from "@/features/inventory/pages/inventory-page";
 import { LogisticsPage } from "@/features/logistics/pages/logistics-page";
 import { SettingsPage } from "@/features/settings/pages/settings-page";
+import { ClientsListPage } from "@/features/clients/pages/clients-list-page";
+import { SuperAdminRoute } from "@/app/SuperAdminRoute";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -42,6 +44,14 @@ export const router = createBrowserRouter([
       { path: "logistics", element: <LogisticsPage /> },
       { path: "sales", element: <SalesPage /> },
       { path: "settings", element: <SettingsPage /> },
+      {
+        path: "clients",
+        element: (
+          <SuperAdminRoute>
+            <ClientsListPage />
+          </SuperAdminRoute>
+        ),
+      },
     ],
   },
 ]);

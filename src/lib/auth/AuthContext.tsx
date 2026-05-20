@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as authApi from "@/lib/api/auth";
-import type { AuthUser } from "@/lib/api/auth";
+import type { AuthUser, Role } from "@/lib/api/auth";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -61,4 +61,34 @@ export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
   return ctx;
+}
+
+interface RoleInfo {
+  role: Role | null;
+  isSuperAdmin: boolean;
+  isCompanyAdmin: boolean;
+  companyId: string | null;
+  companyName: string | null;
+}
+
+export function useRole(): RoleInfo {
+  const { user } = useAuth();
+  return useMemo(() => {
+    if (!user) {
+      return {
+        role: null,
+        isSuperAdmin: false,
+        isCompanyAdmin: false,
+        companyId: null,
+        companyName: null,
+      };
+    }
+    return {
+      role: user.role,
+      isSuperAdmin: user.role === "super_admin",
+      isCompanyAdmin: user.role === "company_admin",
+      companyId: user.companyId ?? null,
+      companyName: user.companyName ?? null,
+    };
+  }, [user]);
 }

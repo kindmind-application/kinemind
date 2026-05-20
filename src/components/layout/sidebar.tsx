@@ -10,19 +10,35 @@ import {
   TrendingUp,
   Settings,
   LogOut,
+  UserCog,
+  type LucideIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useAuth } from "@/lib/auth/AuthContext";
+import { useAuth, useRole } from "@/lib/auth/AuthContext";
 
-const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+interface NavItem {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+}
+
+const superAdminNav: NavItem[] = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Clientes y Empresas", href: "/companies", icon: Building2 },
+  { name: "Cuentas de cliente", href: "/clients", icon: UserCog },
   { name: "Usuarios", href: "/users", icon: Users },
   { name: "Dispositivos", href: "/devices", icon: Watch },
   { name: "Producción", href: "/production", icon: Package },
   { name: "Inventario", href: "/inventory", icon: Warehouse },
   { name: "Logística", href: "/logistics", icon: Truck },
   { name: "Ventas y Marketing", href: "/sales", icon: TrendingUp },
+  { name: "Configuración", href: "/settings", icon: Settings },
+];
+
+const companyAdminNav: NavItem[] = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Usuarios", href: "/users", icon: Users },
+  { name: "Dispositivos", href: "/devices", icon: Watch },
   { name: "Configuración", href: "/settings", icon: Settings },
 ];
 
@@ -37,6 +53,9 @@ export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { isSuperAdmin } = useRole();
+
+  const navigation = isSuperAdmin ? superAdminNav : companyAdminNav;
 
   const handleLogout = async () => {
     try {
@@ -56,7 +75,9 @@ export function Sidebar() {
           </div>
           <div>
             <div className="font-semibold text-lg">Kine Mind</div>
-            <div className="text-xs text-blue-200">Admin Panel</div>
+            <div className="text-xs text-blue-200">
+              {isSuperAdmin ? "Admin Panel" : "Panel de cliente"}
+            </div>
           </div>
         </div>
       </div>

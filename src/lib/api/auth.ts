@@ -1,9 +1,14 @@
 import { api } from "./client";
 
+export type Role = "super_admin" | "company_admin";
+
 export interface AuthUser {
   id: string;
   username: string;
   displayName: string;
+  role: Role;
+  companyId?: string | null;
+  companyName?: string | null;
 }
 
 export interface LoginResponse {
