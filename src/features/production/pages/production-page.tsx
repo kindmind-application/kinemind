@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Search, Eye, MoreVertical, Play, ClipboardCheck, CheckCircle2, Ban,
-  Factory, PackageCheck, TrendingUp, Boxes,
+  Factory, PackageCheck, TrendingUp, Boxes, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,7 @@ import { DataTable } from "@/components/shared/data-table";
 import { toast } from "sonner";
 import {
   listBatches, getBatch, createBatch,
-  startBatch, qaBatch, completeBatch, cancelBatch, updateBatch,
+  startBatch, qaBatch, completeBatch, cancelBatch, updateBatch, deleteBatch,
   batchesKeys,
   BATCH_STATUS_LABEL, batchStatusVariant,
   type Batch, type BatchStatus, type BatchListParams,
@@ -125,6 +125,16 @@ export function ProductionPage() {
     onError: (e) => toast.error(e instanceof ApiError ? e.message : "Error"),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: deleteBatch,
+    onSuccess: () => {
+      toast.success("Lote eliminado");
+      queryClient.invalidateQueries({ queryKey: batchesKeys.all });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Error"),
+  });
+
   const yieldPct = (b: Batch) =>
     b.quantityTarget > 0 ? Math.round((b.quantityPassedQa / b.quantityTarget) * 100) : 0;
 
@@ -133,6 +143,16 @@ export function ProductionPage() {
       key: "batchCode",
       header: "Código",
       render: (b: Batch) => <span className="font-medium text-gray-900">{b.batchCode}</span>,
+    },
+    {
+      key: "companyName",
+      header: "Empresa",
+      render: (b: Batch) =>
+        b.companyName ? (
+          <span className="text-sm text-gray-900">{b.companyName}</span>
+        ) : (
+          <span className="text-sm text-gray-400">-</span>
+        ),
     },
     {
       key: "orderId",
@@ -232,6 +252,16 @@ export function ProductionPage() {
                 </DropdownMenuItem>
               </>
             )}
+            <DropdownMenuItem
+              className="text-red-600 focus:text-red-600"
+              onClick={() => {
+                if (window.confirm("¿Eliminar este lote?")) {
+                  deleteMutation.mutate(b.id);
+                }
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />Eliminar
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ),

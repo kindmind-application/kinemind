@@ -26,6 +26,8 @@ export interface Batch {
   createdAt: string;
   updatedAt: string;
   order?: BatchOrderInfo | null;
+  companyId?: string | null;
+  companyName?: string | null;
 }
 
 export interface BatchListParams {
@@ -93,6 +95,10 @@ export function completeBatch(
 
 export function cancelBatch(id: string): Promise<Batch> {
   return api<Batch>(`/batches/${id}/cancel`, { method: "POST" });
+}
+
+export function deleteBatch(id: string): Promise<void> {
+  return api<void>(`/batches/${id}`, { method: "DELETE" });
 }
 
 export const BATCH_STATUS_LABEL: Record<BatchStatus, string> = {
