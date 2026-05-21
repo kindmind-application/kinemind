@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Eye, MoreVertical, Send, CheckCircle2, FileText } from "lucide-react";
+import { Plus, Search, Eye, MoreVertical, Send, CheckCircle2, FileText, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -23,7 +23,7 @@ import { DataTable } from "@/components/shared/data-table";
 import { toast } from "sonner";
 import { listCompanies, companiesKeys } from "@/lib/api/companies";
 import {
-  listQuotes, getQuote, createQuote, updateQuote,
+  listQuotes, getQuote, createQuote, updateQuote, deleteQuote,
   quotesKeys, contractsKeys,
   QUOTE_STATUS_LABEL, quoteStatusVariant, formatCOP,
   createContract,
@@ -82,6 +82,15 @@ export function QuotesTab() {
     mutationFn: (id: string) => updateQuote(id, { status: "accepted" }),
     onSuccess: () => {
       toast.success("Cotización aceptada");
+      queryClient.invalidateQueries({ queryKey: quotesKeys.all });
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Error"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteQuote(id),
+    onSuccess: () => {
+      toast.success("Cotización eliminada");
       queryClient.invalidateQueries({ queryKey: quotesKeys.all });
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : "Error"),
@@ -164,6 +173,17 @@ export function QuotesTab() {
                 Crear contrato
               </DropdownMenuItem>
             )}
+            <DropdownMenuItem
+              className="text-red-600 focus:text-red-600"
+              onClick={() => {
+                if (window.confirm("¿Eliminar esta cotización?")) {
+                  deleteMutation.mutate(q.id);
+                }
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-2 text-red-600" />
+              Eliminar
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -287,6 +307,18 @@ function CreateQuoteDialog({ open, onOpenChange, companies }: CreateQuoteDialogP
       toast.error("Selecciona una empresa");
       return;
     }
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      if (!l.sku) { toast.error(`Línea ${i + 1}: selecciona un SKU`); return; }
+      const qty = Number(l.quantity);
+      if (!Number.isInteger(qty) || qty < 1 || qty > 1_000_000) {
+        toast.error(`Línea ${i + 1}: cantidad debe ser entero entre 1 y 1.000.000`); return;
+      }
+      const price = Number(l.unitPrice);
+      if (!Number.isFinite(price) || price < 0 || price > 1_000_000_000) {
+        toast.error(`Línea ${i + 1}: precio debe estar entre 0 y 1.000.000.000`); return;
+      }
+    }
     mutation.mutate({
       companyId,
       validUntil: validUntil || undefined,
@@ -355,11 +387,11 @@ function CreateQuoteDialog({ open, onOpenChange, companies }: CreateQuoteDialogP
                       onChange={(e) => updateLine(i, { description: e.target.value })} />
                   </div>
                   <div className="col-span-2">
-                    <Input type="number" min="1" placeholder="Qty" value={l.quantity}
+                    <Input type="number" min="1" max="1000000" step="1" placeholder="Qty" value={l.quantity}
                       onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })} />
                   </div>
                   <div className="col-span-3">
-                    <Input type="number" min="0" placeholder="Precio" value={l.unitPrice}
+                    <Input type="number" min="0" max="1000000000" placeholder="Precio" value={l.unitPrice}
                       onChange={(e) => updateLine(i, { unitPrice: Number(e.target.value) })} />
                   </div>
                   <div className="col-span-1">
@@ -514,8 +546,7 @@ function QuoteDetailSheet({ id, onOpenChange }: { id: string | null; onOpenChang
               <table className="w-full mt-2 text-xs border">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-2 py-1 text-left">SKU</th>
-                    <th className="px-2 py-1 text-left">Descripción</th>
+                    <th className="px-2 py-1 text-left">Producto</th>
                     <th className="px-2 py-1 text-right">Qty</th>
                     <th className="px-2 py-1 text-right">Precio</th>
                     <th className="px-2 py-1 text-right">Total</th>
@@ -524,8 +555,10 @@ function QuoteDetailSheet({ id, onOpenChange }: { id: string | null; onOpenChang
                 <tbody>
                   {(q.items ?? []).map((it) => (
                     <tr key={it.lineNo} className="border-t">
-                      <td className="px-2 py-1">{it.sku}</td>
-                      <td className="px-2 py-1">{it.description}</td>
+                      <td className="px-2 py-1">
+                        <div className="font-medium text-gray-900">{it.description || it.sku}</div>
+                        <div className="text-xs text-gray-500">{it.sku}</div>
+                      </td>
                       <td className="px-2 py-1 text-right">{it.quantity}</td>
                       <td className="px-2 py-1 text-right">{formatCOP(it.unitPrice)}</td>
                       <td className="px-2 py-1 text-right">{formatCOP(it.lineTotal)}</td>

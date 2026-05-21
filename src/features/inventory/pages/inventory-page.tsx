@@ -163,8 +163,8 @@ function CreateSkuDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
   const [sku, setSku] = useState("");
   const [name, setName] = useState("");
   const [category, setCategory] = useState<InventoryCategory>("device");
-  const [reorderPoint, setReorderPoint] = useState(10);
-  const [unitCost, setUnitCost] = useState(0);
+  const [reorderPointStr, setReorderPointStr] = useState("");
+  const [unitCostStr, setUnitCostStr] = useState("");
 
   const mutation = useMutation({
     mutationFn: createInventoryItem,
@@ -172,7 +172,7 @@ function CreateSkuDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
       toast.success("SKU creado");
       queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
       onOpenChange(false);
-      setSku(""); setName(""); setCategory("device"); setReorderPoint(10); setUnitCost(0);
+      setSku(""); setName(""); setCategory("device"); setReorderPointStr(""); setUnitCostStr("");
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : "Error"),
   });
@@ -196,19 +196,27 @@ function CreateSkuDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
           </div>
           <div>
             <Label>Punto de reorden</Label>
-            <Input type="number" min="0" value={reorderPoint}
-              onChange={(e) => setReorderPoint(Number(e.target.value))} />
+            <Input type="number" min="0" step="1" placeholder="0" value={reorderPointStr}
+              onChange={(e) => setReorderPointStr(e.target.value)} />
           </div>
           <div>
             <Label>Costo unitario (COP)</Label>
-            <Input type="number" min="0" value={unitCost}
-              onChange={(e) => setUnitCost(Number(e.target.value))} />
+            <Input type="number" min="0" placeholder="0" value={unitCostStr}
+              onChange={(e) => setUnitCostStr(e.target.value)} />
           </div>
         </div>
         <DialogFooter>
           <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
           <Button onClick={() => {
             if (!sku || !name) { toast.error("SKU y nombre son obligatorios"); return; }
+            const reorderPoint = reorderPointStr === "" ? 0 : parseInt(reorderPointStr, 10);
+            const unitCost = unitCostStr === "" ? 0 : parseFloat(unitCostStr);
+            if (!Number.isInteger(reorderPoint) || reorderPoint < 0) {
+              toast.error("Punto de reorden debe ser un entero >= 0"); return;
+            }
+            if (!Number.isFinite(unitCost) || unitCost < 0) {
+              toast.error("Costo unitario debe ser un número >= 0"); return;
+            }
             mutation.mutate({ sku, name, category, reorderPoint, unitCost });
           }} disabled={mutation.isPending} className="bg-[#1e3a8a] hover:bg-[#1e40af]">
             {mutation.isPending ? "Creando..." : "Crear"}

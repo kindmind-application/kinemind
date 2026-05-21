@@ -277,7 +277,7 @@ function CreateOrderDialog({
           </div>
           <div>
             <Label>Cantidad de dispositivos</Label>
-            <Input type="number" min="1" value={requestedDevices}
+            <Input type="number" min="1" max="1000000" step="1" value={requestedDevices}
               onChange={(e) => setRequestedDevices(Number(e.target.value))} />
           </div>
           <div>
@@ -291,6 +291,9 @@ function CreateOrderDialog({
           <Button onClick={() => {
             if (!companyId) { toast.error("Selecciona una empresa"); return; }
             if (!contractId) { toast.error("Selecciona un contrato"); return; }
+            if (!Number.isInteger(requestedDevices) || requestedDevices < 1 || requestedDevices > 1_000_000) {
+              toast.error("Cantidad de dispositivos debe ser entero entre 1 y 1.000.000"); return;
+            }
             mutation.mutate({
               contractId,
               requestedDevices,
