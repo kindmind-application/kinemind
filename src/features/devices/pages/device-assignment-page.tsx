@@ -13,17 +13,24 @@ import { PageHeader } from "@/components/shared/page-header";
 import { listDevices, assignDevice, devicesKeys } from "@/lib/api/devices";
 import { listCompanies, companiesKeys } from "@/lib/api/companies";
 import { listEmployees, employeesKeys } from "@/lib/api/employees";
+import { useRole } from "@/lib/auth/AuthContext";
 import { ApiError } from "@/lib/api/client";
 
 export function DeviceAssignmentPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { isCompanyAdmin, companyId: roleCompanyId } = useRole();
   const presetCompanyId = searchParams.get("companyId") ?? "";
   const presetEmployeeId = searchParams.get("employeeId") ?? "";
   const queryClient = useQueryClient();
   const [deviceSearch, setDeviceSearch] = useState("");
   const [deviceId, setDeviceId] = useState<string>("");
-  const [companyId, setCompanyId] = useState<string>(presetCompanyId);
+  // company_admin's company is implicit — lock it from the auth context so the
+  // Empresa select disappears and we never accidentally show another tenant's
+  // devices/employees.
+  const [companyId, setCompanyId] = useState<string>(
+    isCompanyAdmin ? (roleCompanyId ?? "") : presetCompanyId
+  );
   const [employeeId, setEmployeeId] = useState<string>(presetEmployeeId);
 
   const availableDevicesQuery = useQuery({
@@ -130,30 +137,32 @@ export function DeviceAssignmentPage() {
                   <CardTitle className="text-base font-semibold">Usuario Destino</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="company">Empresa *</Label>
-                      <Select
-                        value={companyId}
-                        onValueChange={(v) => {
-                          if (v !== companyId) {
-                            setEmployeeId("");
-                            setDeviceId("");
-                          }
-                          setCompanyId(v);
-                        }}
-                        required
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione empresa" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {companies.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className={isCompanyAdmin ? "" : "grid grid-cols-1 md:grid-cols-2 gap-4"}>
+                    {!isCompanyAdmin && (
+                      <div className="space-y-2">
+                        <Label htmlFor="company">Empresa *</Label>
+                        <Select
+                          value={companyId}
+                          onValueChange={(v) => {
+                            if (v !== companyId) {
+                              setEmployeeId("");
+                              setDeviceId("");
+                            }
+                            setCompanyId(v);
+                          }}
+                          required
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccione empresa" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {companies.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label htmlFor="user">Usuario *</Label>
                       <Select value={employeeId} onValueChange={setEmployeeId} disabled={!companyId} required>
