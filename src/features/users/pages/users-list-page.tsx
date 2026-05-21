@@ -59,21 +59,6 @@ export function UsersListPage() {
       ),
     },
     {
-      key: "companyName",
-      header: "Empresa",
-      render: (user: User) => <span className="text-sm text-gray-600">{user.companyName ?? "-"}</span>,
-    },
-    {
-      key: "position",
-      header: "Cargo",
-      render: (user: User) => (
-        <div>
-          <div className="text-sm text-gray-900">{user.position}</div>
-          <div className="text-xs text-gray-500">{user.area}</div>
-        </div>
-      ),
-    },
-    {
       key: "email",
       header: "Correo",
       render: (user: User) => <span className="text-sm text-gray-600">{user.email}</span>,

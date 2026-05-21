@@ -27,8 +27,17 @@ export function DeviceAssignmentPage() {
   const [employeeId, setEmployeeId] = useState<string>(presetEmployeeId);
 
   const availableDevicesQuery = useQuery({
-    queryKey: devicesKeys.list({ status: "Disponible", pageSize: 100 }),
-    queryFn: () => listDevices({ status: "Disponible", pageSize: 100 }),
+    queryKey: devicesKeys.list({
+      status: "Disponible",
+      companyId: companyId || undefined,
+      pageSize: 100,
+    }),
+    queryFn: () =>
+      listDevices({
+        status: "Disponible",
+        companyId: companyId || undefined,
+        pageSize: 100,
+      }),
   });
 
   const companiesQuery = useQuery({
@@ -127,8 +136,11 @@ export function DeviceAssignmentPage() {
                       <Select
                         value={companyId}
                         onValueChange={(v) => {
+                          if (v !== companyId) {
+                            setEmployeeId("");
+                            setDeviceId("");
+                          }
                           setCompanyId(v);
-                          if (v !== companyId) setEmployeeId("");
                         }}
                         required
                       >

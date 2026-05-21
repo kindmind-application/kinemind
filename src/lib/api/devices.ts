@@ -50,3 +50,13 @@ export function assignDevice(id: string, employeeId: string): Promise<Device> {
 export function unassignDevice(id: string): Promise<Device> {
   return api<Device>(`/devices/${id}/unassign`, { method: "POST" });
 }
+
+export function allocateDeviceToCompany(
+  deviceId: string,
+  companyId: string | null
+): Promise<Device> {
+  return api<Device>(`/devices/${deviceId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ companyId: companyId ?? "" }),
+  });
+}
