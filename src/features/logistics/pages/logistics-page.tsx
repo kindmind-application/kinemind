@@ -24,10 +24,10 @@ import { StatsCard } from "@/components/shared/stats-card";
 import { DataTable } from "@/components/shared/data-table";
 import { toast } from "sonner";
 import { listCompanies, companiesKeys } from "@/lib/api/companies";
-import { listDevices, devicesKeys } from "@/lib/api/devices";
 import {
   listShipments, getShipment, createShipment, updateShipment,
   dispatchShipment, deliverShipment, returnShipment,
+  listBatches, batchesKeys,
   shipmentsKeys,
   SHIPMENT_STATUS_LABEL, shipmentStatusVariant,
   type Shipment, type ShipmentStatus, type ShipmentListParams,
@@ -291,14 +291,19 @@ function CreateShipmentDialog({
   const [orderId, setOrderId] = useState("");
   const [carrier, setCarrier] = useState("");
   const [trackingNumber, setTrackingNumber] = useState("");
-  const [deviceIds, setDeviceIds] = useState<string[]>([]);
+  const [lotIds, setLotIds] = useState<string[]>([]);
 
-  const devicesQuery = useQuery({
-    queryKey: devicesKeys.list({ status: "Disponible", pageSize: 500 }),
-    queryFn: () => listDevices({ status: "Disponible", pageSize: 500 }),
-    enabled: open,
+  // Reset selected lots whenever the company changes
+  useEffect(() => {
+    setLotIds([]);
+  }, [companyId]);
+
+  const lotsQuery = useQuery({
+    queryKey: batchesKeys.list({ status: "completed", pageSize: 100, companyId }),
+    queryFn: () => listBatches({ status: "completed", pageSize: 100, companyId }),
+    enabled: open && !!companyId,
   });
-  const devices = devicesQuery.data?.items ?? [];
+  const lots = lotsQuery.data?.items ?? [];
 
   const mutation = useMutation({
     mutationFn: createShipment,
@@ -306,13 +311,13 @@ function CreateShipmentDialog({
       toast.success("Envío creado");
       queryClient.invalidateQueries({ queryKey: shipmentsKeys.all });
       onOpenChange(false);
-      setCompanyId(""); setOrderId(""); setCarrier(""); setTrackingNumber(""); setDeviceIds([]);
+      setCompanyId(""); setOrderId(""); setCarrier(""); setTrackingNumber(""); setLotIds([]);
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : "Error"),
   });
 
-  const toggleDevice = (id: string) => {
-    setDeviceIds((prev) => prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]);
+  const toggleLot = (id: string) => {
+    setLotIds((prev) => prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]);
   };
 
   return (
@@ -342,18 +347,26 @@ function CreateShipmentDialog({
             <Input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} />
           </div>
           <div>
-            <Label>Dispositivos disponibles ({deviceIds.length} seleccionados)</Label>
+            <Label>Lotes disponibles ({lotIds.length} seleccionados)</Label>
             <div className="mt-2 max-h-48 overflow-y-auto border rounded p-2 space-y-1">
-              {devices.length === 0 ? (
-                <p className="text-sm text-gray-500">No hay dispositivos disponibles</p>
-              ) : devices.map((d) => (
-                <label key={d.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1 rounded">
+              {!companyId ? (
+                <p className="text-sm text-gray-500">Selecciona una empresa primero</p>
+              ) : lotsQuery.isLoading ? (
+                <p className="text-sm text-gray-500">Cargando lotes...</p>
+              ) : lots.length === 0 ? (
+                <p className="text-sm text-gray-500">No hay lotes completados para esta empresa</p>
+              ) : lots.map((l) => (
+                <label key={l.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1 rounded">
                   <input
                     type="checkbox"
-                    checked={deviceIds.includes(d.id)}
-                    onChange={() => toggleDevice(d.id)}
+                    checked={lotIds.includes(l.id)}
+                    onChange={() => toggleLot(l.id)}
                   />
-                  <span className="font-mono">{d.id}</span>
+                  <span className="font-medium">{l.batchCode}</span>
+                  <span className="text-xs text-gray-500">
+                    producido: {l.quantityProduced}
+                    {l.orderId ? ` · pedido ${l.orderId.slice(0, 8)}` : ""}
+                  </span>
                 </label>
               ))}
             </div>
@@ -364,13 +377,13 @@ function CreateShipmentDialog({
           <Button onClick={() => {
             if (!companyId) { toast.error("Selecciona una empresa"); return; }
             if (!carrier) { toast.error("Indica la transportadora"); return; }
-            if (deviceIds.length === 0) { toast.error("Selecciona al menos un dispositivo"); return; }
+            if (lotIds.length === 0) { toast.error("Selecciona al menos un lote"); return; }
             mutation.mutate({
               companyId,
               orderId: orderId || undefined,
               carrier,
               trackingNumber: trackingNumber || undefined,
-              deviceIds,
+              lotIds,
             });
           }} disabled={mutation.isPending} className="bg-[#1e3a8a] hover:bg-[#1e40af]">
             {mutation.isPending ? "Creando..." : "Crear"}

@@ -5,6 +5,13 @@ import type { Customer, BadgeVariant } from "./sales";
 // ---------- Batches ----------
 export type BatchStatus = "planned" | "in_progress" | "qa" | "completed" | "cancelled";
 
+export interface BatchOrderInfo {
+  id: string;
+  companyId: string;
+  companyName: string;
+  quantity: number;
+}
+
 export interface Batch {
   id: string;
   batchCode: string;
@@ -18,12 +25,14 @@ export interface Batch {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  order?: BatchOrderInfo | null;
 }
 
 export interface BatchListParams {
   q?: string;
   status?: string;
   orderId?: string;
+  companyId?: string;
   page?: number;
   pageSize?: number;
 }
@@ -251,7 +260,8 @@ export interface CreateShipmentInput {
   companyId: string;
   carrier: string;
   trackingNumber?: string;
-  deviceIds: string[];
+  deviceIds?: string[];
+  lotIds?: string[];
 }
 
 export function createShipment(data: CreateShipmentInput): Promise<Shipment> {

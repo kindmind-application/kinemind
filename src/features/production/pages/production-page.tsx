@@ -479,9 +479,38 @@ function BatchDetailSheet({ id, onOpenChange }: { id: string | null; onOpenChang
             <div><Label className="text-gray-500">Estado</Label>
               <p><Badge variant={batchStatusVariant(b.status)}>{BATCH_STATUS_LABEL[b.status]}</Badge></p>
             </div>
-            <div><Label className="text-gray-500">Pedido</Label>
-              <p className="font-mono">{b.orderId ?? "-"}</p>
-            </div>
+            {b.order ? (
+              <div className="space-y-2 rounded border p-3 bg-gray-50">
+                <Label className="text-gray-500">Pedido</Label>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-gray-500">Empresa:</span>{" "}
+                    <span className="font-medium">{b.order.companyName}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Cantidad:</span>{" "}
+                    <span className="font-medium">{b.order.quantity}</span>
+                  </div>
+                </div>
+                <div className="text-xs">
+                  <span className="text-gray-500">ID:</span>{" "}
+                  <span
+                    className="font-mono cursor-pointer hover:bg-gray-200 px-1 rounded"
+                    title="Click para copiar"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(b.order!.id);
+                      toast.success("ID copiado");
+                    }}
+                  >
+                    {b.order.id}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div><Label className="text-gray-500">Pedido</Label>
+                <p className="font-mono">{b.orderId ?? "-"}</p>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-3">
               <div><Label className="text-gray-500">Objetivo</Label><p>{b.quantityTarget}</p></div>
               <div><Label className="text-gray-500">Producido</Label><p>{b.quantityProduced}</p></div>

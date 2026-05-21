@@ -31,14 +31,17 @@ export function DevicesListPage() {
   const { isCompanyAdmin, isSuperAdmin, companyId } = useRole();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const pageSize = 10;
   const [allocateDevice, setAllocateDevice] = useState<Device | null>(null);
   const [allocateCompanyId, setAllocateCompanyId] = useState<string>("");
 
+  const superAdminCompanyFilter =
+    isSuperAdmin && companyFilter !== "all" ? companyFilter : undefined;
   const filters = {
     q: searchTerm || undefined,
-    companyId: isCompanyAdmin && companyId ? companyId : undefined,
+    companyId: isCompanyAdmin && companyId ? companyId : superAdminCompanyFilter,
     status: statusFilter === "all" ? undefined : statusFilter,
     page,
     pageSize,
@@ -52,8 +55,17 @@ export function DevicesListPage() {
   const companiesQuery = useQuery({
     queryKey: companiesKeys.list({ pageSize: 100, sort: "name:asc" }),
     queryFn: () => listCompanies({ pageSize: 100, sort: "name:asc" }),
-    enabled: isSuperAdmin,
   });
+
+  // Client-side filter fallback when "__none__" (Sin empresa) is selected,
+  // in case backend doesn't honor the sentinel.
+  const filteredItems = (() => {
+    const raw = data?.items ?? [];
+    if (isSuperAdmin && companyFilter === "__none__") {
+      return raw.filter((d) => !d.companyId);
+    }
+    return raw;
+  })();
 
   const companyMap = (() => {
     const m = new Map<string, string>();
@@ -204,7 +216,7 @@ export function DevicesListPage() {
     },
   ];
 
-  const items = data?.items ?? [];
+  const items = filteredItems;
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -256,6 +268,28 @@ export function DevicesListPage() {
                 <SelectItem value="Inactivo">Inactivo</SelectItem>
               </SelectContent>
             </Select>
+            {isSuperAdmin && (
+              <Select
+                value={companyFilter}
+                onValueChange={(v) => {
+                  setCompanyFilter(v);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="w-full md:w-56">
+                  <SelectValue placeholder="Empresa" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="__none__">Sin empresa</SelectItem>
+                  {(companiesQuery.data?.items ?? []).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </Card>
 
