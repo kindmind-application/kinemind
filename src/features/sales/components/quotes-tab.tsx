@@ -358,6 +358,13 @@ function CreateQuoteDialog({ open, onOpenChange, companies }: CreateQuoteDialogP
           <div>
             <Label>Líneas</Label>
             <div className="space-y-2 mt-2">
+              <div className="grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 px-1">
+                <div className="col-span-2">SKU</div>
+                <div className="col-span-4">Descripción</div>
+                <div className="col-span-2">Cantidad</div>
+                <div className="col-span-3">Precio unitario (COP)</div>
+                <div className="col-span-1"></div>
+              </div>
               {lines.map((l, i) => (
                 <div key={i} className="grid grid-cols-12 gap-2 items-end">
                   <div className="col-span-2">
