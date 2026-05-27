@@ -385,11 +385,11 @@ function CompleteBatchDialog({
         <div className="space-y-4">
           <div>
             <Label>Cantidad producida</Label>
-            <Input type="number" min={0} value={produced} onChange={(e) => setProduced(Number(e.target.value))} />
+            <Input type="number" min={0} value={produced || ""} onChange={(e) => setProduced(Number(e.target.value))} />
           </div>
           <div>
             <Label>Cantidad aprobada en QA</Label>
-            <Input type="number" min={0} value={passed} onChange={(e) => setPassed(Number(e.target.value))} />
+            <Input type="number" min={0} value={passed || ""} onChange={(e) => setPassed(Number(e.target.value))} />
           </div>
         </div>
         <DialogFooter>

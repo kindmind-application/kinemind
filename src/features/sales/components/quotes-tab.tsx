@@ -544,9 +544,19 @@ function QuoteDetailSheet({ id, onOpenChange }: { id: string | null; onOpenChang
               <Label className="text-gray-500">Estado</Label>
               <p><Badge variant={quoteStatusVariant(q.status)}>{QUOTE_STATUS_LABEL[q.status]}</Badge></p>
             </div>
-            <div>
-              <Label className="text-gray-500">Total</Label>
-              <p className="font-semibold">{formatCOP(q.total)}</p>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <Label className="text-gray-500">Subtotal</Label>
+                <p>{formatCOP(q.subtotal)}</p>
+              </div>
+              <div className="flex justify-between">
+                <Label className="text-gray-500">IVA (19%)</Label>
+                <p>{formatCOP(q.tax)}</p>
+              </div>
+              <div className="flex justify-between border-t pt-1">
+                <Label className="text-gray-500 font-semibold">Total</Label>
+                <p className="font-semibold">{formatCOP(q.total)}</p>
+              </div>
             </div>
             <div>
               <Label className="text-gray-500">Líneas</Label>
